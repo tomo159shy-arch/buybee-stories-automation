@@ -19,103 +19,133 @@ st.set_page_config(page_title="BuyBee Stories 自動化", page_icon="🛋️", l
 
 st.markdown("""
 <style>
-:root {
-    --bb-bg: #F2F2F7;
-    --bb-card: #FFFFFF;
-    --bb-label: #6E6E73;
-    --bb-text: #1D1D1F;
-    --bb-accent: #FFC300;
-    --bb-radius: 18px;
-    --bb-radius-sm: 12px;
+/* BuyBee在庫管理アプリ(buybee-inventory.vercel.app)と同じApple HIGトークンを使用 */
+:root{
+    --bg:#f2f2f7;
+    --surface:#ffffff;
+    --fill-1:rgba(120,120,128,.12);
+    --fill-2:rgba(120,120,128,.20);
+    --label:#1c1c1e;
+    --label-2:rgba(60,60,67,.60);
+    --label-3:rgba(60,60,67,.30);
+    --sep:rgba(60,60,67,.29);
+    --tint:#007aff;
+    --brand:#ffd60a;
+    --brand-ink:#1c1c1e;
+    --danger:#ff3b30;
+    --r-card:14px; --r-ctl:12px; --r-field:10px;
+    --ease:cubic-bezier(.32,.72,0,1);
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",
+      "Helvetica Neue","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",
+      "YuGothic","Noto Sans JP",sans-serif;
 }
-html, body, [class*="css"] {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Hiragino Sans",
-        "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif !important;
-}
-[data-testid="stAppViewContainer"], [data-testid="stMain"] {
-    background: var(--bb-bg);
-}
-.block-container {
-    padding-top: 2.5rem;
-    padding-bottom: 4rem;
-    max-width: 640px;
+html, body, [class*="css"] { font-family: var(--font) !important; }
+
+/* Streamlitのデフォルトツールバー・フッター・余白を消して、開発ツール感を減らす */
+#MainMenu, header[data-testid="stHeader"], [data-testid="stDecoration"],
+footer, [data-testid="stStatusWidget"] { display: none !important; }
+[data-testid="stAppViewContainer"], [data-testid="stMain"] { background: var(--bg); }
+.block-container { padding-top: 0.75rem; padding-bottom: 4rem; max-width: 640px; }
+
+/* 上部の細いスティッキーナビ(本家アプリの.navと同じ見た目) */
+.bb-nav{
+    position: sticky; top: 0; z-index: 20; margin: -0.75rem -1rem 12px;
+    padding: 12px 16px; display: flex; align-items: center; gap: 8px;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: .5px solid var(--sep);
+    font-size: 16px; font-weight: 590; letter-spacing: -.02em; color: var(--label);
 }
 
 /* カード(st.container(border=True)) */
 [data-testid="stVerticalBlockBorderWrapper"] {
-    background: var(--bb-card);
+    background: var(--surface) !important;
     border: none !important;
-    border-radius: var(--bb-radius) !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    padding: 4px 6px;
-    margin-bottom: 20px;
+    border-radius: var(--r-card) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    padding: 6px 8px;
+    margin-bottom: 16px;
 }
 
-/* 見出し */
-h1 { font-weight: 800 !important; letter-spacing: -0.02em; color: var(--bb-text); }
-h3 { font-weight: 700 !important; color: var(--bb-text); font-size: 1.05rem !important; }
-p, label, .stCaption, [data-testid="stCaptionContainer"] { color: var(--bb-label); }
+/* タイポグラフィ */
+h1 { font-size: 32px !important; font-weight: 700 !important; letter-spacing: -.02em; color: var(--label); margin-bottom: 2px !important; }
+h3 { font-size: 17px !important; font-weight: 640 !important; letter-spacing: -.02em; color: var(--label); margin: 0 !important; }
+p, [data-testid="stCaptionContainer"], [data-testid="stMarkdownContainer"] p { color: var(--label-2); letter-spacing: -.01em; }
+.section-t { font-size: 13px; font-weight: 590; color: var(--label-2); letter-spacing: -.01em; margin: 4px 0 8px; }
 
-/* ボタン */
+/* ボタン(通常は.pill、強調操作は.dockと同じ黄色ボタン) */
 [data-testid="stButton"] button, [data-testid="stDownloadButton"] button {
-    border-radius: 999px !important;
-    font-weight: 600 !important;
+    border-radius: var(--r-card) !important;
+    font-weight: 640 !important;
+    letter-spacing: -.015em;
     border: none !important;
-    padding: 0.6rem 1.2rem !important;
+    height: 46px;
+    transition: transform .12s var(--ease), filter .15s ease;
 }
+[data-testid="stButton"] button:active, [data-testid="stDownloadButton"] button:active { transform: scale(.98); }
 [data-testid="stButton"] button[kind="primary"], [data-testid="stDownloadButton"] button[kind="primary"] {
-    background: var(--bb-accent) !important;
-    color: #1D1D1F !important;
+    background: var(--brand) !important;
+    color: var(--brand-ink) !important;
 }
+[data-testid="stButton"] button[kind="primary"]:active { filter: brightness(.94); }
 [data-testid="stButton"] button[kind="secondary"] {
-    background: #EFEFF2 !important;
-    color: var(--bb-text) !important;
+    background: var(--fill-1) !important;
+    color: var(--label) !important;
 }
 
 /* 入力欄 */
 [data-testid="stTextInput"] input,
 [data-testid="stTextArea"] textarea,
 [data-testid="stNumberInput"] input {
-    background: #EFEFF2 !important;
+    background: var(--fill-1) !important;
     border: none !important;
-    border-radius: var(--bb-radius-sm) !important;
+    border-radius: var(--r-field) !important;
+    color: var(--label) !important;
+    font-size: 16px !important;
 }
 [data-testid="stSelectbox"] > div > div {
-    background: #EFEFF2 !important;
+    background: var(--fill-1) !important;
     border: none !important;
-    border-radius: var(--bb-radius-sm) !important;
+    border-radius: var(--r-field) !important;
 }
+[data-testid="stCheckbox"] { color: var(--label); }
 
-/* タブ */
+/* タブ(chip風) */
 [data-testid="stTabs"] [data-baseweb="tab-list"] {
-    gap: 4px;
-    background: #EFEFF2;
-    border-radius: 999px;
-    padding: 4px;
+    gap: 6px;
+    background: transparent;
+    border-bottom: none;
 }
 [data-testid="stTabs"] [data-baseweb="tab"] {
-    border-radius: 999px !important;
-    padding: 6px 16px !important;
+    background: var(--fill-1) !important;
+    border-radius: 980px !important;
+    padding: 7px 15px !important;
+    font-size: 14px !important;
+    font-weight: 510 !important;
 }
 [data-testid="stTabs"] [aria-selected="true"] {
-    background: var(--bb-card) !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    background: var(--label) !important;
+    color: var(--bg) !important;
 }
+[data-testid="stTabs"] [data-baseweb="tab-highlight"] { display: none; }
 
 /* ファイルアップローダー・エクスパンダー */
 [data-testid="stFileUploaderDropzone"] {
-    background: #EFEFF2 !important;
-    border: 1.5px dashed #C7C7CC !important;
-    border-radius: var(--bb-radius-sm) !important;
+    background: var(--fill-1) !important;
+    border: none !important;
+    border-radius: var(--r-ctl) !important;
 }
 [data-testid="stExpander"] {
     border: none !important;
-    border-radius: var(--bb-radius-sm) !important;
-    background: #FAFAFC;
+    border-radius: var(--r-ctl) !important;
+    background: var(--fill-1);
+    overflow: hidden;
 }
 
-/* 区切り線を目立たなくする */
-hr { border-color: rgba(0,0,0,0.06) !important; }
+/* スライダー(iOS風の黄色トラック) */
+[data-testid="stSlider"] [role="slider"] { background: var(--brand) !important; }
+
+hr { border-color: var(--sep) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -269,17 +299,18 @@ def render_job(job):
 
 def step_header(step, title):
     st.markdown(
-        f"""<div style="margin-bottom:6px;">
-        <span style="font-size:0.75rem;font-weight:700;color:#8E8E93;letter-spacing:0.03em;">STEP {step}</span>
-        <h3 style="margin:2px 0 0 0;">{title}</h3>
+        f"""<div style="margin-bottom:10px;">
+        <div class="section-t">STEP {step}</div>
+        <h3>{title}</h3>
         </div>""",
         unsafe_allow_html=True,
     )
 
 
 st.markdown(
-    """<h1 style="margin-bottom:2px;">🛋️ BuyBee Stories</h1>
-    <p style="margin-top:0;color:#6E6E73;">動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、
+    """<div class="bb-nav">🛋️ <b>BuyBee</b> Stories</div>
+    <h1>🛋️ BuyBee Stories</h1>
+    <p style="margin-top:4px;font-size:15px;">動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、
     Stories用の動画に焼き込みます。複数本まとめて処理できます。</p>""",
     unsafe_allow_html=True,
 )
