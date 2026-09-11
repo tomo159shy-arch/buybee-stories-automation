@@ -17,21 +17,107 @@ from core import (
 
 st.set_page_config(page_title="BuyBee Stories 自動化", page_icon="🛋️", layout="centered")
 
-# APP_PASSWORDが設定されている場合だけ簡易ゲートを表示する
-# (公開デプロイ時に誰でもGemini APIのクォータ/料金を使えてしまうのを防ぐため。
-# ローカル実行でsecretsに設定していなければ、このチェックは素通りする)。
-APP_PASSWORD = st.secrets.get("APP_PASSWORD", "")
-if APP_PASSWORD:
-    if not st.session_state.get("authenticated"):
-        st.title("🛋️ BuyBee Stories 自動生成")
-        pw = st.text_input("パスワード", type="password")
-        if st.button("入る", type="primary"):
-            if pw == APP_PASSWORD:
-                st.session_state["authenticated"] = True
-                st.rerun()
-            else:
-                st.error("パスワードが違います")
-        st.stop()
+st.markdown("""
+<style>
+:root {
+    --bb-bg: #F2F2F7;
+    --bb-card: #FFFFFF;
+    --bb-label: #6E6E73;
+    --bb-text: #1D1D1F;
+    --bb-accent: #FFC300;
+    --bb-radius: 18px;
+    --bb-radius-sm: 12px;
+}
+html, body, [class*="css"] {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Hiragino Sans",
+        "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif !important;
+}
+[data-testid="stAppViewContainer"], [data-testid="stMain"] {
+    background: var(--bb-bg);
+}
+.block-container {
+    padding-top: 2.5rem;
+    padding-bottom: 4rem;
+    max-width: 640px;
+}
+
+/* カード(st.container(border=True)) */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: var(--bb-card);
+    border: none !important;
+    border-radius: var(--bb-radius) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    padding: 4px 6px;
+    margin-bottom: 20px;
+}
+
+/* 見出し */
+h1 { font-weight: 800 !important; letter-spacing: -0.02em; color: var(--bb-text); }
+h3 { font-weight: 700 !important; color: var(--bb-text); font-size: 1.05rem !important; }
+p, label, .stCaption, [data-testid="stCaptionContainer"] { color: var(--bb-label); }
+
+/* ボタン */
+[data-testid="stButton"] button, [data-testid="stDownloadButton"] button {
+    border-radius: 999px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    padding: 0.6rem 1.2rem !important;
+}
+[data-testid="stButton"] button[kind="primary"], [data-testid="stDownloadButton"] button[kind="primary"] {
+    background: var(--bb-accent) !important;
+    color: #1D1D1F !important;
+}
+[data-testid="stButton"] button[kind="secondary"] {
+    background: #EFEFF2 !important;
+    color: var(--bb-text) !important;
+}
+
+/* 入力欄 */
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stNumberInput"] input {
+    background: #EFEFF2 !important;
+    border: none !important;
+    border-radius: var(--bb-radius-sm) !important;
+}
+[data-testid="stSelectbox"] > div > div {
+    background: #EFEFF2 !important;
+    border: none !important;
+    border-radius: var(--bb-radius-sm) !important;
+}
+
+/* タブ */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: 4px;
+    background: #EFEFF2;
+    border-radius: 999px;
+    padding: 4px;
+}
+[data-testid="stTabs"] [data-baseweb="tab"] {
+    border-radius: 999px !important;
+    padding: 6px 16px !important;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+    background: var(--bb-card) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* ファイルアップローダー・エクスパンダー */
+[data-testid="stFileUploaderDropzone"] {
+    background: #EFEFF2 !important;
+    border: 1.5px dashed #C7C7CC !important;
+    border-radius: var(--bb-radius-sm) !important;
+}
+[data-testid="stExpander"] {
+    border: none !important;
+    border-radius: var(--bb-radius-sm) !important;
+    background: #FAFAFC;
+}
+
+/* 区切り線を目立たなくする */
+hr { border-color: rgba(0,0,0,0.06) !important; }
+</style>
+""", unsafe_allow_html=True)
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 if not GEMINI_API_KEY:
@@ -181,11 +267,25 @@ def render_job(job):
     return out_path
 
 
-st.title("🛋️ BuyBee Stories 自動生成")
-st.caption("動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、Stories用の動画に焼き込みます。複数本まとめて処理できます。")
+def step_header(step, title):
+    st.markdown(
+        f"""<div style="margin-bottom:6px;">
+        <span style="font-size:0.75rem;font-weight:700;color:#8E8E93;letter-spacing:0.03em;">STEP {step}</span>
+        <h3 style="margin:2px 0 0 0;">{title}</h3>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+st.markdown(
+    """<h1 style="margin-bottom:2px;">🛋️ BuyBee Stories</h1>
+    <p style="margin-top:0;color:#6E6E73;">動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、
+    Stories用の動画に焼き込みます。複数本まとめて処理できます。</p>""",
+    unsafe_allow_html=True,
+)
 
 with st.container(border=True):
-    st.subheader("① 動画をアップロード（複数可）")
+    step_header(1, "動画をアップロード（複数可）")
     uploaded_files = st.file_uploader(
         "mp4 / mov / avi", type=["mp4", "mov", "avi"],
         accept_multiple_files=True, label_visibility="collapsed",
@@ -219,7 +319,7 @@ if uploaded_files:
     color_names = list(STAMP_COLORS.keys())
 
     with st.container(border=True):
-        st.subheader("② テロップの雰囲気を選んで分析")
+        step_header(2, "テロップの雰囲気を選んで分析")
         style_options = list(STYLE_PRESETS.keys())
         ratings = style_average_ratings()
         default_index = 0
@@ -256,7 +356,7 @@ if uploaded_files:
 
     if all(job["scenes"] is not None for job in jobs):
         with st.container(border=True):
-            st.subheader("③ 動画ごとに内容を確認・編集")
+            step_header(3, "動画ごとに内容を確認・編集")
             for job in jobs:
                 with st.expander(f"🎬 {job['name']}（シーン{len(job['scenes'])}件）", expanded=True):
                     scenes = job["scenes"]
@@ -330,7 +430,7 @@ if uploaded_files:
                                     st.rerun()
 
         with st.container(border=True):
-            st.subheader("④ 動画を生成")
+            step_header(4, "動画を生成")
             if st.button(f"🎬 {len(jobs)}本まとめて焼き込む", type="primary", use_container_width=True):
                 progress = st.progress(0.0)
                 for n, job in enumerate(jobs):
@@ -377,7 +477,7 @@ if uploaded_files:
                 st.divider()
 
         with st.container(border=True):
-            st.subheader("⑤ 説明文だけ保存")
+            step_header(5, "説明文だけ保存")
             all_parts = []
             for job in jobs:
                 parts = [f"=== {job['name']} ==="]
