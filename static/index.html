@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>BuyBee Stories</title>
+<style>
+  :root{
+    --bg:#f2f2f7; --surface:#ffffff;
+    --fill-1:rgba(120,120,128,.12); --fill-2:rgba(120,120,128,.20);
+    --label:#1c1c1e; --label-2:rgba(60,60,67,.60); --label-3:rgba(60,60,67,.30);
+    --sep:rgba(60,60,67,.29);
+    --tint:#007aff; --brand:#ffd60a; --brand-ink:#1c1c1e; --danger:#ff3b30; --ok:#34c759;
+    --r-card:14px; --r-ctl:12px; --r-sheet:22px; --r-field:10px;
+    --ease:cubic-bezier(.32,.72,0,1);
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",
+      "Helvetica Neue","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",
+      "YuGothic","Noto Sans JP",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#000000; --surface:#1c1c1e;
+      --fill-1:rgba(120,120,128,.24); --fill-2:rgba(120,120,128,.36);
+      --label:#ffffff; --label-2:rgba(235,235,245,.60); --label-3:rgba(235,235,245,.30);
+      --sep:rgba(84,84,88,.60);
+      --tint:#0a84ff; --brand:#ffd60a; --danger:#ff453a; --ok:#30d158;
+    }
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--label);font-family:var(--font);
+    font-size:17px;line-height:1.47;letter-spacing:-.011em;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:0 16px}
+  a{color:var(--tint);text-decoration:none}
+  button{font-family:inherit;color:inherit}
+
+  .nav{
+    position:sticky;top:0;z-index:20;
+    background:color-mix(in srgb,var(--bg) 82%,transparent);
+    -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+    border-bottom:.5px solid var(--sep);
+  }
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:44px}
+  .nav-brand{font-size:16px;font-weight:590;letter-spacing:-.02em}
+
+  .largetitle{padding:14px 0 6px}
+  h1{margin:0;font-size:32px;line-height:1.13;font-weight:700;letter-spacing:-.02em}
+  .sub{margin:4px 0 0;color:var(--label-2);font-size:15px;letter-spacing:-.01em}
+
+  main{padding-bottom:120px}
+  .section-t{font-size:13px;font-weight:590;color:var(--label-2);letter-spacing:-.01em;margin:22px 2px 8px}
+
+  .card{background:var(--surface);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,0,0,.05);
+    padding:16px;margin-bottom:12px}
+  @media (prefers-color-scheme:dark){.card{box-shadow:none}}
+
+  .drop{border:1.5px dashed var(--label-3);border-radius:var(--r-ctl);background:var(--fill-1);
+    padding:28px 16px;text-align:center;cursor:pointer;color:var(--label-2);font-size:15px}
+  .drop input{display:none}
+  .drop b{color:var(--label);font-weight:600}
+
+  .pillrow{display:flex;flex-wrap:wrap;gap:8px}
+  .pill{cursor:pointer;border:0;background:var(--fill-1);color:var(--label);
+    font-size:14px;font-weight:510;letter-spacing:-.01em;padding:9px 14px;border-radius:980px;
+    transition:background .14s ease,color .14s ease,transform .1s var(--ease)}
+  .pill:active{transform:scale(.96)}
+  .pill.on{background:var(--label);color:var(--bg)}
+
+  label.lbl{display:block;font-size:13px;font-weight:590;color:var(--label-2);letter-spacing:-.01em;margin:14px 0 6px}
+  .inp{width:100%;border:0;background:var(--fill-1);color:var(--label);
+    font-size:16px;font-family:inherit;letter-spacing:-.01em;padding:12px 13px;border-radius:var(--r-field);outline:0}
+  .inp:focus{box-shadow:inset 0 0 0 2px var(--tint)}
+  textarea.inp{resize:vertical;line-height:1.4;min-height:64px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:end}
+
+  .btn{border:0;cursor:pointer;font-size:16px;font-weight:640;letter-spacing:-.015em;
+    padding:13px 16px;border-radius:var(--r-ctl);transition:transform .12s var(--ease),filter .15s ease;
+    height:46px}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--brand);color:var(--brand-ink)}
+  .btn-primary:active{filter:brightness(.94)}
+  .btn-plain{background:var(--fill-1);color:var(--label)}
+  .btn-block{width:100%}
+  .btn[disabled]{opacity:.4;pointer-events:none}
+
+  .jobcard{background:var(--surface);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,0,0,.05);
+    margin-bottom:14px;overflow:hidden}
+  @media (prefers-color-scheme:dark){.jobcard{box-shadow:none}}
+  .jobhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;gap:8px}
+  .jobhead .name{font-weight:640;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jobhead .status{font-size:12px;color:var(--label-2);flex:none}
+  .jobbody{padding:0 16px 16px}
+  .scenetabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none}
+  .scenetabs::-webkit-scrollbar{display:none}
+
+  .checkrow{display:flex;align-items:center;gap:8px;margin:14px 0 4px;font-size:14px;color:var(--label-2)}
+  .checkrow input{width:18px;height:18px;accent-color:var(--brand)}
+
+  .rangewrap{margin:14px 0 4px}
+  input[type=range]{width:100%;accent-color:var(--brand)}
+
+  .stampregen{display:flex;align-items:center;justify-content:center;background:var(--fill-1);
+    color:var(--label);border-radius:var(--r-field);cursor:pointer;font-size:13px;height:46px;width:46px;flex:none}
+
+  video{width:100%;border-radius:var(--r-ctl);background:#000;display:block;margin-top:12px}
+
+  .stars{display:flex;gap:6px;margin:12px 0 8px}
+  .star{font-size:26px;cursor:pointer;color:var(--label-3)}
+  .star.on{color:var(--brand)}
+
+  .warn{font-size:13px;color:var(--danger);margin-top:8px}
+  .muted{color:var(--label-2);font-size:13px}
+  .spinner{display:inline-block;width:13px;height:13px;vertical-align:-2px;margin-right:6px;
+    border:2px solid var(--label-3);border-top-color:var(--label-2);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .dock{position:fixed;left:0;right:0;bottom:0;z-index:30;
+    padding:8px 16px calc(10px + env(safe-area-inset-bottom));
+    background:color-mix(in srgb,var(--bg) 80%,transparent);
+    -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+    border-top:.5px solid var(--sep)}
+  .dock button{width:100%;max-width:520px;margin:0 auto;display:flex}
+  .dock[hidden]{display:none}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <span class="nav-brand">🛋️ BuyBee <b>Stories</b></span>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="largetitle">
+    <h1>Stories 自動生成</h1>
+    <p class="sub">動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、Stories用の動画に焼き込みます。</p>
+  </div>
+
+  <div class="section-t">動画をアップロード（複数可）</div>
+  <label class="drop" id="dropzone">
+    <input type="file" id="fileInput" multiple accept="video/mp4,video/quicktime,video/x-msvideo">
+    <div>📹 タップして動画を選択<br><b>MP4 / MOV / AVI</b></div>
+  </label>
+
+  <div id="styleSection" hidden>
+    <div class="section-t">テロップの雰囲気</div>
+    <div class="pillrow" id="stylePills"></div>
+    <div id="ratingHint" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <div id="jobsSection"></div>
+
+  <div id="exportSection" hidden style="margin-top:20px">
+    <button class="btn btn-plain btn-block" id="exportBtn">📥 説明文をテキストで保存（全動画分）</button>
+  </div>
+</main>
+
+<div class="dock" id="dock" hidden>
+  <button class="btn btn-primary" id="dockBtn"></button>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+let OPTIONS = null;
+let selectedStyle = null;
+let jobs = []; // {id, name, status, scenes, activeScene, url, warning, error}
+
+async function api(url, opts){
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(await res.text().catch(()=> 'HTTP '+res.status));
+  return res.json();
+}
+
+async function loadOptions(){
+  OPTIONS = await api('/api/options');
+  selectedStyle = OPTIONS.style_ratings.length
+    ? OPTIONS.style_ratings.reduce((a,b)=> b.avg>a.avg?b:a).name
+    : OPTIONS.styles[0];
+  renderStylePills();
+}
+
+function renderStylePills(){
+  const box = $('#stylePills'); box.innerHTML = '';
+  OPTIONS.styles.forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'pill' + (name === selectedStyle ? ' on' : '');
+    b.textContent = name;
+    b.onclick = () => { selectedStyle = name; renderStylePills(); };
+    box.appendChild(b);
+  });
+  const hint = $('#ratingHint');
+  if (OPTIONS.style_ratings.length){
+    hint.textContent = '過去の評価: ' + OPTIONS.style_ratings.map(r => `${r.name} 平均${r.avg.toFixed(1)}点(n=${r.n})`).join(' / ');
+  } else {
+    hint.textContent = '';
+  }
+}
+
+$('#fileInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f));
+  const res = await api('/api/upload', { method:'POST', body: fd });
+  res.jobs.forEach(j => jobs.push({ id:j.id, name:j.name, status:'uploaded', scenes:null, activeScene:0, url:'', warning:null, error:null }));
+  $('#styleSection').hidden = false;
+  renderJobs();
+  updateDock();
+  e.target.value = '';
+});
+
+function updateDock(){
+  const dock = $('#dock'), btn = $('#dockBtn');
+  if (!jobs.length){ dock.hidden = true; return; }
+  const allAnalyzed = jobs.every(j => j.status === 'analyzed' || j.status === 'rendering' || j.status === 'done');
+  const anyAnalyzing = jobs.some(j => j.status === 'analyzing');
+  const anyRendering = jobs.some(j => j.status === 'rendering');
+  dock.hidden = false;
+  if (anyRendering){
+    btn.innerHTML = '<span class="spinner"></span>書き出し中...'; btn.disabled = true;
+  } else if (allAnalyzed){
+    btn.textContent = `🎬 ${jobs.length}本まとめて焼き込む`; btn.disabled = false;
+    btn.onclick = renderAll;
+  } else if (anyAnalyzing){
+    btn.innerHTML = '<span class="spinner"></span>分析中...'; btn.disabled = true;
+  } else {
+    btn.textContent = `🔍 ${jobs.length}本を分析する`; btn.disabled = false;
+    btn.onclick = analyzeAll;
+  }
+}
+
+async function analyzeAll(){
+  for (const job of jobs){
+    job.status = 'analyzing';
+  }
+  renderJobs(); updateDock();
+  await Promise.all(jobs.map(async job => {
+    try {
+      const fd = new FormData();
+      fd.append('style_key', selectedStyle);
+      fd.append('product_url', job.url || '');
+      await api(`/api/jobs/${job.id}/analyze`, { method:'POST', body: fd });
+      await pollJob(job);
+    } catch (e) {
+      job.status = 'error'; job.error = e.message;
+    }
+  }));
+  renderJobs(); updateDock();
+  $('#exportSection').hidden = false;
+}
+
+async function pollJob(job){
+  while (true){
+    const data = await api(`/api/jobs/${job.id}`);
+    job.status = data.status; job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
+    if (['analyzed','done','error'].includes(data.status)) return data;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
+async function renderAll(){
+  for (const job of jobs) job.status = 'rendering';
+  renderJobs(); updateDock();
+  await Promise.all(jobs.map(async job => {
+    try {
+      await flushSync(job);
+      await api(`/api/jobs/${job.id}/render`, { method:'POST' });
+      await pollJob(job);
+    } catch (e) {
+      job.status = 'error'; job.error = e.message;
+    }
+  }));
+  renderJobs(); updateDock();
+}
+
+const syncTimers = {};
+function sceneField(job, i, key, value){
+  job.scenes[i][key] = value;
+  syncScenes(job);
+}
+
+function syncScenes(job){
+  // 連続入力のたびに送信すると通信が競合しうるので、少し待ってまとめて送る
+  clearTimeout(syncTimers[job.id]);
+  syncTimers[job.id] = setTimeout(() => flushSync(job), 500);
+}
+
+async function flushSync(job){
+  clearTimeout(syncTimers[job.id]);
+  await api(`/api/jobs/${job.id}/scenes`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ scenes: job.scenes }),
+  });
+}
+
+function renderJobs(){
+  const box = $('#jobsSection'); box.innerHTML = '';
+  jobs.forEach(job => box.appendChild(jobCard(job)));
+}
+
+function jobCard(job){
+  const el = document.createElement('div');
+  el.className = 'jobcard';
+
+  const statusLabel = {
+    uploaded:'待機中', analyzing:'分析中…', analyzed:'編集可能',
+    rendering:'書き出し中…', done:'完成', error:'エラー',
+  }[job.status] || job.status;
+
+  let head = `<div class="jobhead"><div class="name">🎬 ${esc(job.name)}</div><div class="status">${esc(statusLabel)}</div></div>`;
+  let body = '<div class="jobbody">';
+
+  if (job.status === 'uploaded'){
+    body += `<label class="lbl">商品URL（任意・ページの情報も加味します）</label>
+      <input class="inp" placeholder="https://..." value="${esc(job.url)}" data-role="url">`;
+  }
+
+  if (job.error){
+    body += `<div class="warn">⚠️ ${esc(job.error)}</div>`;
+  } else if (job.warning){
+    body += `<div class="warn">⚠️ ${esc(job.warning)}</div>`;
+  }
+
+  if (job.scenes && job.scenes.length){
+    body += '<div class="scenetabs">';
+    job.scenes.forEach((s, i) => {
+      body += `<button class="pill${i===job.activeScene?' on':''}" data-scene-tab="${i}">シーン${i+1}</button>`;
+    });
+    body += '</div>';
+    body += sceneForm(job, job.activeScene);
+  }
+
+  if (job.status === 'done'){
+    body += `<video controls src="/api/jobs/${job.id}/video?t=${Date.now()}"></video>
+      <a class="btn btn-plain btn-block" style="display:block;text-align:center;margin-top:10px;text-decoration:none"
+        href="/api/jobs/${job.id}/video" download>📥 ダウンロード</a>
+      <div class="lbl" style="margin-top:16px">この動画を5段階で評価</div>
+      <div class="stars" data-rate-box></div>`;
+  }
+
+  body += '</div>';
+  el.innerHTML = head + body;
+
+  const urlInput = el.querySelector('[data-role="url"]');
+  if (urlInput) urlInput.addEventListener('input', e => { job.url = e.target.value; });
+
+  el.querySelectorAll('[data-scene-tab]').forEach(btn => {
+    btn.addEventListener('click', () => { job.activeScene = Number(btn.dataset.sceneTab); renderJobs(); });
+  });
+
+  wireSceneForm(el, job);
+
+  if (job.status === 'done'){
+    const starBox = el.querySelector('[data-rate-box]');
+    let rated = job.ratedValue || 0;
+    function drawStars(){
+      starBox.innerHTML = '';
+      for (let i=1;i<=5;i++){
+        const s = document.createElement('span');
+        s.className = 'star' + (i<=rated ? ' on' : '');
+        s.textContent = '★';
+        s.onclick = async () => {
+          rated = i; job.ratedValue = i; drawStars();
+          await api(`/api/jobs/${job.id}/rate`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ rating: i }),
+          });
+          loadOptions();
+        };
+        starBox.appendChild(s);
+      }
+    }
+    drawStars();
+  }
+
+  return el;
+}
+
+function sceneForm(job, i){
+  const s = job.scenes[i];
+  const hashtags = Array.isArray(s.hashtags) ? s.hashtags.join(' ') : (s.hashtags || '');
+  return `
+    <div class="checkrow"><input type="checkbox" data-f="skip" ${s.skip?'checked':''}> このシーンにはテロップ・スタンプを入れない</div>
+    <label class="lbl">キャッチコピー</label>
+    <input class="inp" data-f="title" value="${esc(s.title)}">
+    <label class="lbl">特徴（改行で複数行）</label>
+    <textarea class="inp" data-f="body">${esc(s.body)}</textarea>
+    <label class="lbl">価格</label>
+    <input class="inp" data-f="price" value="${esc(s.price)}">
+    <label class="lbl">ハッシュタグ</label>
+    <input class="inp" data-f="hashtags" value="${esc(hashtags)}">
+    <label class="lbl">文字の大きさ</label>
+    <div class="rangewrap"><input type="range" min="0.6" max="1.6" step="0.1" value="${s.text_scale}" data-f="text_scale"></div>
+    <div class="row2">
+      <div><label class="lbl">フォント</label>
+        <select class="inp" data-f="font_choice">${OPTIONS.fonts.map(f=>`<option ${f===s.font_choice?'selected':''}>${esc(f)}</option>`).join('')}</select>
+      </div>
+      <div><label class="lbl">文字の色</label>
+        <select class="inp" data-f="text_color">${OPTIONS.text_colors.map(c=>`<option ${c===s.text_color?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="row3">
+      <div><label class="lbl">スタンプ文言</label>
+        <input class="inp" data-f="stamp_text" value="${esc(s.stamp_text)}"></div>
+      <div><label class="lbl">スタンプ色</label>
+        <select class="inp" data-f="stamp_color">${OPTIONS.stamp_colors.map(c=>`<option ${c===s.stamp_color?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      <div><label class="lbl">&nbsp;</label>
+        <button type="button" class="stampregen" data-regen title="スタンプを再生成">🔄</button></div>
+    </div>
+  `;
+}
+
+function wireSceneForm(el, job){
+  const i = job.activeScene;
+  if (!job.scenes || !job.scenes[i]) return;
+  el.querySelectorAll('[data-f]').forEach(input => {
+    const key = input.dataset.f;
+    const handler = () => {
+      let val = input.type === 'checkbox' ? input.checked : input.value;
+      if (key === 'text_scale') val = parseFloat(val);
+      sceneField(job, i, key, val);
+    };
+    input.addEventListener(input.tagName === 'SELECT' || input.type==='range' ? 'change' : 'input', handler);
+  });
+  const regen = el.querySelector('[data-regen]');
+  if (regen) regen.addEventListener('click', async () => {
+    const s = job.scenes[i];
+    const r = await api('/api/stamp/shuffle', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: s.stamp_text, color: s.stamp_color }),
+    });
+    s.stamp_text = r.text; s.stamp_color = r.color;
+    syncScenes(job);
+    renderJobs();
+  });
+}
+
+$('#exportBtn').addEventListener('click', () => {
+  const parts = jobs.map(job => {
+    const scenes = (job.scenes || []).filter(s => !s.skip).map((s, i) =>
+      `[シーン${i+1}]\n${s.title||''}\n${s.body||''}\n${s.price||''}\n${Array.isArray(s.hashtags)?s.hashtags.join(' '):(s.hashtags||'')}`
+    ).join('\n\n');
+    return `=== ${job.name} ===\n${scenes}`;
+  });
+  const blob = new Blob([parts.join('\n\n\n')], { type:'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'buybee_description.txt';
+  a.click();
+});
+
+loadOptions();
+</script>
+</body>
+</html>

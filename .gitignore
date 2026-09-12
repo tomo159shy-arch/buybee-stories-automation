@@ -1,4 +1,4 @@
-.streamlit/secrets.toml
+.env
 feedback_log.jsonl
 __pycache__/
 *.pyc

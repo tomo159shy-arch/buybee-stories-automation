@@ -63,14 +63,6 @@ def shuffle_stamp(current_text, current_color, color_names):
     return random.choice(text_choices), random.choice(color_choices)
 
 
-def notify_done(title, message):
-    """Windowsのデスクトップ通知を出す。通知バックエンドが使えない環境でも
-    アプリ自体は落とさない。"""
-    try:
-        from plyer import notification
-        notification.notify(title=title, message=message, timeout=8)
-    except Exception:
-        pass
 
 STAMP_COLORS = {
     "ピンク": "#FF3D8A",
