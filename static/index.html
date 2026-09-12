@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffdf57" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1608" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>BuyBee Stories</title>
 <style>
   :root{
@@ -158,6 +162,10 @@
     <p class="sub">アップロードすると、シーンごとにGeminiが説明文とスタンプを作り、動画に焼き込みます。</p>
   </div>
 
+  <div id="pushBanner" style="text-align:center;margin-bottom:8px" hidden>
+    <button class="pill" id="pushBtn">完成したら通知を受け取る</button>
+  </div>
+
   <div class="section-t">動画をアップロード（複数可）</div>
   <label class="drop" id="dropzone">
     <input type="file" id="fileInput" multiple accept="video/mp4,video/quicktime,video/x-msvideo">
@@ -223,6 +231,46 @@ async function loadOptions(){
   renderStylePills();
   renderFontPills();
   renderColorPills();
+  setupPushBanner();
+}
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function setupPushBanner(){
+  const supported = OPTIONS.push_enabled && 'serviceWorker' in navigator && 'PushManager' in window;
+  if (!supported) return;
+  if (Notification.permission === 'granted') return; // すでに有効
+  $('#pushBanner').hidden = false;
+  $('#pushBtn').addEventListener('click', enablePush);
+}
+
+async function enablePush(){
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      alert('通知が許可されませんでした');
+      return;
+    }
+    const { publicKey } = await api('/api/push/public-key');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    await api('/api/push/subscribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    $('#pushBanner').hidden = true;
+  } catch (e) {
+    alert('通知の設定に失敗しました: ' + e.message
+      + (location.protocol !== 'https:' ? '（HTTPSでのみ使えます）' : ''));
+  }
 }
 
 function renderStylePills(){
@@ -268,15 +316,33 @@ const dropDefaultHTML = () => `<span class="icon dicon" id="dropIcon">${ICON.vid
 $('#dropContent').innerHTML = dropDefaultHTML();
 $('#exportBtn').innerHTML = `<span class="icon">${ICON.doc}</span>説明文をテキストで保存（全動画分）`;
 
+function uploadWithProgress(files, onProgress){
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    });
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+      else reject(new Error('HTTP ' + xhr.status));
+    };
+    xhr.onerror = () => reject(new Error('通信エラー'));
+    xhr.send(fd);
+  });
+}
+
 $('#fileInput').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
   const content = $('#dropContent');
-  content.innerHTML = '<span class="spinner"></span>アップロード中…';
+  content.innerHTML = '<span class="spinner"></span>アップロード中… 0%';
   try {
-    const fd = new FormData();
-    files.forEach(f => fd.append('files', f));
-    const res = await api('/api/upload', { method:'POST', body: fd });
+    const res = await uploadWithProgress(files, (pct) => {
+      content.innerHTML = `<span class="spinner"></span>アップロード中… ${pct}%`;
+    });
     res.jobs.forEach(j => jobs.push({ id:j.id, name:j.name, status:'uploaded', scenes:null, activeScene:0, url:'', warning:null, error:null }));
     $('#styleSection').hidden = false;
     saveJobIds();

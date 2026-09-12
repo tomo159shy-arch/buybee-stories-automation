@@ -376,7 +376,10 @@ def burn_video_scenes(video_path, scenes, out_path):
         *inputs,
         "-filter_complex", filter_complex,
         "-map", f"[{prev_label}]",
-        "-map", "0:a?",
+        # 0:a? だと全ての音声トラックを含めようとし、新型iPhoneの空間オーディオ
+        # (apacコーデック)のような未対応トラックが混ざっていると全体が失敗する。
+        # 最初の音声トラックだけを使う。
+        "-map", "0:a:0?",
         # threads/preset: Renderの無料枠(メモリ512MB)でOOM Killされたため、
         # 画質より省メモリを優先(スレッド数を絞るとx264の内部バッファも減る)。
         "-threads", "1",

@@ -6,12 +6,14 @@ import uuid
 import shutil
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
+from pywebpush import webpush, WebPushException
 import cv2
 
 from core import (
@@ -25,10 +27,42 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-flash-lite-latest"
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:admin@example.com")
+PUSH_SUBSCRIPTIONS = []
+PUSH_LOCK = threading.Lock()
+
 app = FastAPI()
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
+
+
+def send_push_to_all(title, body):
+    """完成通知をすべての購読者に送る。無効になった購読は取り除く。"""
+    if not VAPID_PRIVATE_KEY:
+        return
+    dead = []
+    with PUSH_LOCK:
+        subs = list(PUSH_SUBSCRIPTIONS)
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info=sub,
+                data=json.dumps({"title": title, "body": body}),
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_CLAIM_EMAIL},
+            )
+        except WebPushException:
+            dead.append(sub)
+        except Exception:
+            dead.append(sub)
+    if dead:
+        with PUSH_LOCK:
+            for sub in dead:
+                if sub in PUSH_SUBSCRIPTIONS:
+                    PUSH_SUBSCRIPTIONS.remove(sub)
 
 
 def ask_gemini(frame_path, style_key, product_context=""):
@@ -48,7 +82,10 @@ def ask_gemini(frame_path, style_key, product_context=""):
 例:収納付き/伸縮式/クッション性など)を中心に書いてください。家具と無関係な行動の説明や、
 家具の種類を無視した抽象的な言い回しは避けてください。
 テロップは次のスタイルで作成してください: {style_desc}
-価格が分からない場合は price を空文字にしてください。体験談や断定的な効果効能は書かないでください。
+画面内に価格を書いた値札・POP(紙やカード)が写っていることが多いので、見えていたら
+そこに書かれた数字を正確に読み取ってpriceに入れてください（税込/税抜の記載があれば
+それも含める）。見えない・読み取れない場合のみ price を空文字にしてください。
+体験談や断定的な効果効能は書かないでください。
 {context_block}
 以下のJSON形式で出力してください。
 
@@ -84,6 +121,51 @@ def ask_gemini(frame_path, style_key, product_context=""):
     raise last_error
 
 
+def analyze_one_scene(job, idx, start, end, style_key, product_context):
+    """1シーン分の代表フレーム抽出+Gemini分析。シーン間で並列実行できるよう
+    副作用(ファイル保存)以外は全部この関数の中で完結させている。"""
+    video_path = job["video_path"]
+    duration = end - start
+    candidate_times = [start + duration * r for r in (0.5, 0.25, 0.75)]
+    text_zone = stamp_corner = None
+    result, last_error = {}, None
+    for t in candidate_times:
+        ret, frame = grab_frame_at(video_path, t)
+        if not ret:
+            continue
+        if text_zone is None:
+            text_zone, stamp_corner = analyze_zones(frame)
+            # 編集画面でどのシーンか目で見て確認できるよう保存しておく
+            cv2.imwrite(os.path.join(job["job_dir"], f"scene_{idx}.jpg"), frame)
+        frame_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        cv2.imwrite(frame_temp.name, frame)
+        frame_temp.close()
+        try:
+            result = ask_gemini(frame_temp.name, style_key, product_context)
+            if not result.get("title") and not result.get("body"):
+                # APIは成功したが中身が空。原因が見えなくなるので失敗扱いにして
+                # 次の候補フレームを試す/最終的に警告を出す。
+                raise ValueError("生成結果が空でした")
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            time.sleep(3)
+        finally:
+            os.unlink(frame_temp.name)
+
+    if text_zone is None:
+        return None, last_error
+    scene = {
+        "start": start, "end": end,
+        "text_zone": text_zone, "stamp_corner": stamp_corner,
+        "text_scale": 1.0, "skip": False,
+        "font_choice": list(FONT_OPTIONS.keys())[0], "text_color": "白",
+        **result,
+    }
+    return scene, last_error
+
+
 def analyze_video_job(job_id, style_key, product_url):
     job = JOBS[job_id]
     try:
@@ -96,43 +178,28 @@ def analyze_video_job(job_id, style_key, product_url):
 
         video_path = job["video_path"]
         scene_bounds = detect_scenes(video_path)
+
+        # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して
+        # 分析時間を短縮する(逐次だとシーン数×待ち時間がそのまま積み上がる)。
+        results = [None] * len(scene_bounds)
+        with ThreadPoolExecutor(max_workers=max(len(scene_bounds), 1)) as pool:
+            futures = {
+                pool.submit(analyze_one_scene, job, idx, start, end, style_key, product_context): idx
+                for idx, (start, end) in enumerate(scene_bounds)
+            }
+            for future in as_completed(futures):
+                idx = futures[future]
+                results[idx] = future.result()
+
         scenes = []
-        for idx, (start, end) in enumerate(scene_bounds):
-            duration = end - start
-            candidate_times = [start + duration * r for r in (0.5, 0.25, 0.75)]
-            text_zone = stamp_corner = None
-            result, last_error = {}, None
-            for t in candidate_times:
-                ret, frame = grab_frame_at(video_path, t)
-                if not ret:
-                    continue
-                if text_zone is None:
-                    text_zone, stamp_corner = analyze_zones(frame)
-                    # 編集画面でどのシーンか目で見て確認できるよう保存しておく
-                    cv2.imwrite(os.path.join(job["job_dir"], f"scene_{idx}.jpg"), frame)
-                frame_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                cv2.imwrite(frame_temp.name, frame)
-                frame_temp.close()
-                try:
-                    result = ask_gemini(frame_temp.name, style_key, product_context)
-                    last_error = None
-                    break
-                except Exception as e:
-                    last_error = e
-                    time.sleep(3)
-                finally:
-                    os.unlink(frame_temp.name)
+        warnings = []
+        for scene, last_error in results:
             if last_error is not None:
-                job["warning"] = f"シーン分析に失敗しました: {last_error}"
-            if text_zone is None:
-                continue
-            scenes.append({
-                "start": start, "end": end,
-                "text_zone": text_zone, "stamp_corner": stamp_corner,
-                "text_scale": 1.0, "skip": False,
-                "font_choice": list(FONT_OPTIONS.keys())[0], "text_color": "白",
-                **result,
-            })
+                warnings.append(str(last_error))
+            if scene is not None:
+                scenes.append(scene)
+        if warnings:
+            job["warning"] = "シーン分析に失敗しました: " + " / ".join(warnings)
 
         job["scenes"] = scenes
         job["style_key"] = style_key
@@ -169,6 +236,7 @@ def render_job_task(job_id):
         burn_video_scenes(job["video_path"], render_scenes, out_path)
         job["output_path"] = out_path
         job["status"] = "done"
+        send_push_to_all("BuyBee Stories", f"「{job['name']}」の動画が完成しました")
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
@@ -185,7 +253,21 @@ def get_options():
             {"name": name, "avg": avg, "n": n}
             for name, (avg, n) in style_average_ratings().items()
         ],
+        "push_enabled": bool(VAPID_PRIVATE_KEY),
     }
+
+
+@app.get("/api/push/public-key")
+def push_public_key():
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(payload: dict):
+    with PUSH_LOCK:
+        if payload not in PUSH_SUBSCRIPTIONS:
+            PUSH_SUBSCRIPTIONS.append(payload)
+    return {"ok": True}
 
 
 @app.post("/api/upload")
