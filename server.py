@@ -43,6 +43,10 @@ def ask_gemini(frame_path, style_key, product_context=""):
     )
 
     prompt = f"""これは中古家具リサイクルショップ「BuyBee」のInstagram/TikTok Stories用の動画フレームです。
+主役は必ず画面に写っている家具そのものです。人物や手が映っていても、それは家具の使い方を
+見せているだけなので、テロップは家具本体の特徴(種類・素材・色・サイズ感・触り心地・機能、
+例:収納付き/伸縮式/クッション性など)を中心に書いてください。家具と無関係な行動の説明や、
+家具の種類を無視した抽象的な言い回しは避けてください。
 テロップは次のスタイルで作成してください: {style_desc}
 価格が分からない場合は price を空文字にしてください。体験談や断定的な効果効能は書かないでください。
 {context_block}
@@ -64,7 +68,14 @@ def ask_gemini(frame_path, style_key, product_context=""):
                 contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/png"), prompt],
                 config=types.GenerateContentConfig(response_mime_type="application/json"),
             )
-            return json.loads(response.text)
+            parsed = json.loads(response.text)
+            # まれにGeminiが単一オブジェクトではなく配列で返すことがあるため、
+            # その場合は先頭要素を採用し、辞書でなければリトライさせる。
+            if isinstance(parsed, list):
+                parsed = parsed[0] if parsed else {}
+            if not isinstance(parsed, dict):
+                raise ValueError(f"予期しない形式のレスポンス: {type(parsed).__name__}")
+            return parsed
         except Exception as e:
             last_error = e
             if attempt < 2:
@@ -86,7 +97,7 @@ def analyze_video_job(job_id, style_key, product_url):
         video_path = job["video_path"]
         scene_bounds = detect_scenes(video_path)
         scenes = []
-        for start, end in scene_bounds:
+        for idx, (start, end) in enumerate(scene_bounds):
             duration = end - start
             candidate_times = [start + duration * r for r in (0.5, 0.25, 0.75)]
             text_zone = stamp_corner = None
@@ -97,6 +108,8 @@ def analyze_video_job(job_id, style_key, product_url):
                     continue
                 if text_zone is None:
                     text_zone, stamp_corner = analyze_zones(frame)
+                    # 編集画面でどのシーンか目で見て確認できるよう保存しておく
+                    cv2.imwrite(os.path.join(job["job_dir"], f"scene_{idx}.jpg"), frame)
                 frame_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
                 cv2.imwrite(frame_temp.name, frame)
                 frame_temp.close()
@@ -245,6 +258,17 @@ def get_video(job_id: str):
     if not job or not job.get("output_path"):
         raise HTTPException(404, "video not ready")
     return FileResponse(job["output_path"], media_type="video/mp4", filename=f"buybee_story_{job['name']}.mp4")
+
+
+@app.get("/api/jobs/{job_id}/scene/{index}/frame")
+def get_scene_frame(job_id: str, index: int):
+    job = JOBS.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    frame_path = os.path.join(job["job_dir"], f"scene_{index}.jpg")
+    if not os.path.exists(frame_path):
+        raise HTTPException(404, "frame not found")
+    return FileResponse(frame_path, media_type="image/jpeg")
 
 
 @app.post("/api/jobs/{job_id}/rate")

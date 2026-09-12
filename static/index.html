@@ -107,6 +107,8 @@
   .jobbody{padding:16px}
   .scenetabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none}
   .scenetabs::-webkit-scrollbar{display:none}
+  .sceneframe{width:100%;max-height:280px;object-fit:contain;background:var(--surface-2);
+    border-radius:var(--r-s);display:block;margin-bottom:14px}
 
   .urlbox{background:var(--surface-2);border-radius:var(--r-s);padding:14px;overflow:visible}
   .urlbox-label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px;color:var(--text)}
@@ -384,6 +386,11 @@ async function renderAll(){
     }
   }));
   renderJobs(); updateDock();
+  const firstDone = jobs.find(j => j.status === 'done');
+  if (firstDone) {
+    const el = document.getElementById(`video-${firstDone.id}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 const syncTimers = {};
@@ -448,9 +455,12 @@ function jobCard(job){
   }
 
   if (job.status === 'done'){
-    body += `<video controls src="/api/jobs/${job.id}/video?t=${Date.now()}"></video>
-      <a class="btn btn-plain btn-block" style="margin-top:10px;text-decoration:none"
-        href="/api/jobs/${job.id}/video" download><span class="icon">${ICON.download}</span>ダウンロード</a>
+    body += `<video id="video-${job.id}" controls autoplay muted loop playsinline
+        src="/api/jobs/${job.id}/video?t=${Date.now()}"></video>
+      <p class="muted" style="text-align:center;margin:8px 0 0">
+        iPhoneの場合: 動画を長押し→「ビデオを保存」でカメラロールに保存できます</p>
+      <a class="btn btn-primary btn-block" style="margin-top:10px;text-decoration:none"
+        href="/api/jobs/${job.id}/video" download><span class="icon">${ICON.download}</span>動画をダウンロード</a>
       <div class="lbl" style="margin-top:16px">この動画を5段階で評価</div>
       <div class="stars" data-rate-box></div>`;
   }
@@ -510,6 +520,8 @@ function fontPills(fieldName, fonts, current){
 function sceneForm(job, i){
   const s = job.scenes[i];
   return `
+    <img class="sceneframe" src="/api/jobs/${job.id}/scene/${i}/frame" alt="シーン${i+1}のフレーム"
+      onerror="this.style.display='none'">
     <div class="checkrow"><input type="checkbox" data-f="skip" ${s.skip?'checked':''}> このシーンにはテロップ・スタンプを入れない</div>
     <label class="lbl">キャッチコピー</label>
     <input class="inp" data-f="title" value="${esc(s.title)}">
