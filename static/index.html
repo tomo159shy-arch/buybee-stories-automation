@@ -39,46 +39,42 @@
   a{color:var(--tint);text-decoration:none}
   button{font-family:inherit;color:inherit}
 
+  .icon{width:1em;height:1em;display:inline-block;vertical-align:-0.14em;flex:none}
+  .icon svg{width:100%;height:100%;display:block}
+
   .nav{
     position:sticky;top:0;z-index:20;
-    background:var(--surface);
-    border-bottom:1px solid rgba(0,0,0,.06);
-    box-shadow:0 2px 8px rgba(0,0,0,.04);
+    background:color-mix(in srgb,var(--bg) 82%,transparent);
+    -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+    border-bottom:.5px solid var(--sep);
   }
-  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:48px}
-  .nav-brand{font-size:16px;font-weight:700;letter-spacing:-.02em}
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:44px}
+  .nav-brand{font-size:16px;font-weight:590;letter-spacing:-.02em}
 
-  .hero{
-    background:linear-gradient(135deg,#FFE066 0%,#FFD60A 55%,#FFC300 100%);
-    border-radius:24px;padding:26px 22px;margin:18px 0 8px;
-    box-shadow:0 12px 28px rgba(255,198,0,.35);
-  }
-  .hero .icon{font-size:38px;display:block;margin-bottom:6px}
-  .hero h1{margin:0;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-.02em;color:#1c1c1e}
-  .hero .sub{margin:6px 0 0;color:rgba(28,28,30,.72);font-size:14.5px;letter-spacing:-.01em}
+  .largetitle{padding:14px 0 6px}
+  h1{margin:0;font-size:32px;line-height:1.13;font-weight:700;letter-spacing:-.02em}
+  .sub{margin:4px 0 0;color:var(--label-2);font-size:15px;letter-spacing:-.01em}
 
   main{padding-bottom:120px}
-  .section-t{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;
-    color:var(--label);letter-spacing:-.01em;margin:26px 2px 10px}
-  .section-t::before{content:'';width:4px;height:15px;border-radius:2px;background:var(--brand);flex:none}
+  .section-t{font-size:13px;font-weight:590;color:var(--label-2);letter-spacing:-.01em;margin:22px 2px 8px}
 
-  .card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:20px;
-    box-shadow:0 8px 20px rgba(0,0,0,.06);padding:16px;margin-bottom:12px}
-  @media (prefers-color-scheme:dark){.card{box-shadow:none;border-color:var(--sep)}}
+  .card{background:var(--surface);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,0,0,.05);
+    padding:16px;margin-bottom:12px}
+  @media (prefers-color-scheme:dark){.card{box-shadow:none}}
 
   .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;
-    border:2px dashed #ffc300;border-radius:20px;background:rgba(255,214,10,.10);
-    padding:30px 16px;text-align:center;cursor:pointer;color:var(--label-2);font-size:15px}
+    border:1.5px dashed var(--label-3);border-radius:var(--r-ctl);background:var(--fill-1);
+    padding:28px 16px;text-align:center;cursor:pointer;color:var(--label-2);font-size:15px}
   .drop input{display:none}
-  .drop .dicon{font-size:32px;display:block;margin-bottom:6px}
-  .drop b{color:var(--label);font-weight:700}
+  .drop .dicon{width:28px;height:28px;margin-bottom:8px;color:var(--label-2)}
+  .drop b{color:var(--label);font-weight:600}
 
   .pillrow{display:flex;flex-wrap:wrap;gap:8px}
-  .pill{cursor:pointer;border:0;background:rgba(255,214,10,.14);color:#6b5400;
-    font-size:14px;font-weight:700;letter-spacing:-.01em;padding:9px 14px;border-radius:980px;
+  .pill{cursor:pointer;border:0;background:var(--fill-1);color:var(--label);
+    font-size:14px;font-weight:510;letter-spacing:-.01em;padding:9px 14px;border-radius:980px;
     transition:background .14s ease,color .14s ease,transform .1s var(--ease)}
   .pill:active{transform:scale(.96)}
-  .pill.on{background:var(--brand);color:#1c1c1e;box-shadow:0 4px 12px rgba(255,214,10,.5)}
+  .pill.on{background:var(--label);color:var(--bg)}
 
   label.lbl{display:block;font-size:13px;font-weight:590;color:var(--label-2);letter-spacing:-.01em;margin:14px 0 6px}
   .inp{width:100%;border:0;background:var(--fill-1);color:var(--label);
@@ -90,46 +86,44 @@
   .swatch-pill{display:inline-flex;align-items:center;gap:6px}
   .swatch-pill .dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex:none}
 
-  .btn{border:0;cursor:pointer;font-size:16px;font-weight:700;letter-spacing:-.015em;
-    padding:13px 16px;border-radius:16px;transition:transform .12s var(--ease),filter .15s ease;
-    height:48px}
+  .btn{border:0;cursor:pointer;font-size:16px;font-weight:640;letter-spacing:-.015em;
+    padding:13px 16px;border-radius:var(--r-ctl);transition:transform .12s var(--ease),filter .15s ease;
+    height:46px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
   .btn:active{transform:scale(.98)}
-  .btn-primary{background:var(--brand);color:var(--brand-ink);box-shadow:0 8px 20px rgba(255,198,0,.45)}
+  .btn-primary{background:var(--brand);color:var(--brand-ink)}
   .btn-primary:active{filter:brightness(.94)}
-  .btn-plain{background:var(--fill-1);color:var(--label);box-shadow:none}
+  .btn-plain{background:var(--fill-1);color:var(--label)}
   .btn-block{width:100%}
-  .btn[disabled]{opacity:.4;pointer-events:none;box-shadow:none}
+  .btn[disabled]{opacity:.4;pointer-events:none}
 
-  .jobcard{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:20px;
-    box-shadow:0 8px 20px rgba(0,0,0,.06);margin-bottom:14px;overflow:hidden}
-  @media (prefers-color-scheme:dark){.jobcard{box-shadow:none;border-color:var(--sep)}}
-  .jobhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;gap:8px;
-    background:rgba(255,214,10,.10)}
-  .jobhead .name{font-weight:700;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .jobhead .status{font-size:12px;font-weight:600;color:#6b5400;flex:none;background:rgba(255,214,10,.25);
-    padding:3px 10px;border-radius:980px}
+  .jobcard{background:var(--surface);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,0,0,.05);
+    margin-bottom:14px;overflow:hidden}
+  @media (prefers-color-scheme:dark){.jobcard{box-shadow:none}}
+  .jobhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;gap:8px}
+  .jobhead .name{font-weight:640;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jobhead .status{font-size:12px;color:var(--label-2);flex:none}
   .jobbody{padding:0 16px 16px}
   .scenetabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none}
   .scenetabs::-webkit-scrollbar{display:none}
 
-  .urlbox{background:rgba(10,132,255,.07);border:1px solid rgba(10,132,255,.18);border-radius:16px;
-    padding:14px}
-  .urlbox-label{font-weight:700;font-size:14.5px;color:var(--label)}
+  .urlbox{background:var(--fill-1);border-radius:var(--r-ctl);padding:14px}
+  .urlbox-label{display:flex;align-items:center;gap:6px;font-weight:590;font-size:14.5px;color:var(--label)}
 
   .checkrow{display:flex;align-items:center;gap:8px;margin:14px 0 4px;font-size:14px;color:var(--label-2)}
-  .checkrow input{width:18px;height:18px;accent-color:var(--brand)}
+  .checkrow input{width:18px;height:18px;accent-color:var(--tint)}
 
   .rangewrap{margin:14px 0 4px}
-  input[type=range]{width:100%;accent-color:var(--brand)}
+  input[type=range]{width:100%;accent-color:var(--tint)}
 
-  .stampregen{display:flex;align-items:center;justify-content:center;background:rgba(255,214,10,.18);
-    color:#6b5400;border-radius:var(--r-field);cursor:pointer;font-size:16px;height:46px;width:46px;flex:none}
+  .stampregen{display:flex;align-items:center;justify-content:center;background:var(--fill-1);
+    color:var(--label);border-radius:var(--r-field);cursor:pointer;height:46px;width:46px;flex:none}
+  .stampregen .icon{width:18px;height:18px}
 
   video{width:100%;border-radius:var(--r-ctl);background:#000;display:block;margin-top:12px}
 
   .stars{display:flex;gap:6px;margin:12px 0 8px}
-  .star{font-size:26px;cursor:pointer;color:var(--label-3)}
-  .star.on{color:var(--brand)}
+  .star{font-size:24px;cursor:pointer;color:var(--label-3)}
+  .star.on{color:var(--tint)}
 
   .warn{font-size:13px;color:var(--danger);margin-top:8px}
   .muted{color:var(--label-2);font-size:13px}
@@ -138,24 +132,23 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   .dock{position:fixed;left:0;right:0;bottom:0;z-index:30;
-    padding:12px 16px calc(14px + env(safe-area-inset-bottom));
-    background:var(--surface);
-    border-top:1px solid rgba(0,0,0,.08);
-    box-shadow:0 -4px 16px rgba(0,0,0,.06)}
-  .dock button{width:100%;max-width:520px;margin:0 auto;display:flex}
+    padding:8px 16px calc(10px + env(safe-area-inset-bottom));
+    background:color-mix(in srgb,var(--bg) 80%,transparent);
+    -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+    border-top:.5px solid var(--sep)}
+  .dock button{width:100%;max-width:520px;margin:0 auto}
   .dock[hidden]{display:none}
 </style>
 </head>
 <body>
 <header class="nav">
   <div class="wrap">
-    <span class="nav-brand">🛋️ BuyBee <b>Stories</b></span>
+    <span class="nav-brand">BuyBee <b>Stories</b></span>
   </div>
 </header>
 
 <main class="wrap">
-  <div class="hero">
-    <span class="icon">🛋️</span>
+  <div class="largetitle">
     <h1>Stories 自動生成</h1>
     <p class="sub">動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、Stories用の動画に焼き込みます。</p>
   </div>
@@ -163,7 +156,7 @@
   <div class="section-t">動画をアップロード（複数可）</div>
   <label class="drop" id="dropzone">
     <input type="file" id="fileInput" multiple accept="video/mp4,video/quicktime,video/x-msvideo">
-    <span class="dicon">📹</span>タップして動画を選択<br><b>MP4 / MOV / AVI</b>
+    <span id="dropContent"><span class="icon dicon" id="dropIcon"></span>タップして動画を選択<br><b>MP4 / MOV / AVI</b></span>
   </label>
 
   <div id="styleSection" hidden>
@@ -175,7 +168,7 @@
   <div id="jobsSection"></div>
 
   <div id="exportSection" hidden style="margin-top:20px">
-    <button class="btn btn-plain btn-block" id="exportBtn">📥 説明文をテキストで保存（全動画分）</button>
+    <button class="btn btn-plain btn-block" id="exportBtn"></button>
   </div>
 </main>
 
@@ -186,6 +179,15 @@
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => (s ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+// SF Symbols風のシンプルな線画アイコン(絵文字は使わない)
+const ICON = {
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3z"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M10 6.5l1-1a4 4 0 0 1 5.7 5.7l-1.2 1.2"/><path d="M14 17.5l-1 1a4 4 0 0 1-5.7-5.7l1.2-1.2"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9M20.5 12a8.5 8.5 0 0 1-14.6 5.9"/><path d="M18.5 3v4h-4M5.5 21v-4h4"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7.5 11.5L12 16l4.5-4.5"/><path d="M4.5 19h15"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13 3.5v4.5h4.5"/><path d="M9 13h6M9 16.5h6"/></svg>',
+};
 
 let OPTIONS = null;
 let selectedStyle = null;
@@ -222,18 +224,61 @@ function renderStylePills(){
   }
 }
 
+const dropDefaultHTML = () => `<span class="icon dicon" id="dropIcon">${ICON.video}</span>タップして動画を選択<br><b>MP4 / MOV / AVI</b>`;
+$('#dropContent').innerHTML = dropDefaultHTML();
+$('#exportBtn').innerHTML = `<span class="icon">${ICON.doc}</span>説明文をテキストで保存（全動画分）`;
+
 $('#fileInput').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
-  const fd = new FormData();
-  files.forEach(f => fd.append('files', f));
-  const res = await api('/api/upload', { method:'POST', body: fd });
-  res.jobs.forEach(j => jobs.push({ id:j.id, name:j.name, status:'uploaded', scenes:null, activeScene:0, url:'', warning:null, error:null }));
+  const content = $('#dropContent');
+  content.innerHTML = '<span class="spinner"></span>アップロード中…';
+  try {
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    const res = await api('/api/upload', { method:'POST', body: fd });
+    res.jobs.forEach(j => jobs.push({ id:j.id, name:j.name, status:'uploaded', scenes:null, activeScene:0, url:'', warning:null, error:null }));
+    $('#styleSection').hidden = false;
+    saveJobIds();
+    renderJobs();
+    updateDock();
+  } catch (err) {
+    alert('アップロードに失敗しました: ' + err.message);
+  } finally {
+    content.innerHTML = dropDefaultHTML();
+    e.target.value = '';
+  }
+});
+
+function saveJobIds(){
+  try { localStorage.setItem('bb_job_ids', JSON.stringify(jobs.map(j => j.id))); } catch (e) {}
+}
+
+async function restoreJobs(){
+  let ids = [];
+  try { ids = JSON.parse(localStorage.getItem('bb_job_ids') || '[]'); } catch (e) {}
+  if (!ids.length) return;
+  const restored = [];
+  for (const id of ids) {
+    try {
+      const data = await api(`/api/jobs/${id}`);
+      restored.push({
+        id, name: data.name, status: data.status, scenes: data.scenes,
+        activeScene: 0, url: '', warning: data.warning, error: data.error,
+      });
+    } catch (e) { /* サーバー再起動等で消えていたら無視 */ }
+  }
+  if (!restored.length) return;
+  jobs = restored;
+  saveJobIds();
   $('#styleSection').hidden = false;
+  if (jobs.some(j => j.scenes && j.scenes.length)) $('#exportSection').hidden = false;
   renderJobs();
   updateDock();
-  e.target.value = '';
-});
+  jobs.filter(j => j.status === 'analyzing' || j.status === 'rendering').forEach(job => {
+    pollJob(job).then(() => { renderJobs(); updateDock(); });
+  });
+}
 
 function updateDock(){
   const dock = $('#dock'), btn = $('#dockBtn');
@@ -245,12 +290,12 @@ function updateDock(){
   if (anyRendering){
     btn.innerHTML = '<span class="spinner"></span>書き出し中...'; btn.disabled = true;
   } else if (allAnalyzed){
-    btn.textContent = `🎬 ${jobs.length}本まとめて焼き込む`; btn.disabled = false;
+    btn.textContent = `${jobs.length}本まとめて焼き込む`; btn.disabled = false;
     btn.onclick = renderAll;
   } else if (anyAnalyzing){
     btn.innerHTML = '<span class="spinner"></span>分析中...'; btn.disabled = true;
   } else {
-    btn.textContent = `🔍 ${jobs.length}本を分析する`; btn.disabled = false;
+    btn.textContent = `${jobs.length}本を分析する`; btn.disabled = false;
     btn.onclick = analyzeAll;
   }
 }
@@ -333,12 +378,12 @@ function jobCard(job){
     rendering:'書き出し中…', done:'完成', error:'エラー',
   }[job.status] || job.status;
 
-  let head = `<div class="jobhead"><div class="name">🎬 ${esc(job.name)}</div><div class="status">${esc(statusLabel)}</div></div>`;
+  let head = `<div class="jobhead"><div class="name">${esc(job.name)}</div><div class="status">${esc(statusLabel)}</div></div>`;
   let body = '<div class="jobbody">';
 
   if (job.status === 'uploaded'){
     body += `<div class="urlbox">
-      <div class="urlbox-label">🔗 商品ページのURL（任意）</div>
+      <div class="urlbox-label"><span class="icon">${ICON.link}</span>商品ページのURL（任意）</div>
       <div class="muted" style="margin:2px 0 8px">貼ると、ページの情報も見た目と合わせて説明文に反映します</div>
       <input class="inp" placeholder="https://..." value="${esc(job.url)}" data-role="url">
     </div>`;
@@ -361,8 +406,8 @@ function jobCard(job){
 
   if (job.status === 'done'){
     body += `<video controls src="/api/jobs/${job.id}/video?t=${Date.now()}"></video>
-      <a class="btn btn-plain btn-block" style="display:block;text-align:center;margin-top:10px;text-decoration:none"
-        href="/api/jobs/${job.id}/video" download>📥 ダウンロード</a>
+      <a class="btn btn-plain btn-block" style="margin-top:10px;text-decoration:none"
+        href="/api/jobs/${job.id}/video" download><span class="icon">${ICON.download}</span>ダウンロード</a>
       <div class="lbl" style="margin-top:16px">この動画を5段階で評価</div>
       <div class="stars" data-rate-box></div>`;
   }
@@ -441,7 +486,7 @@ function sceneForm(job, i){
     <label class="lbl">スタンプ文言</label>
     <div class="row3">
       <input class="inp" data-f="stamp_text" value="${esc(s.stamp_text)}">
-      <button type="button" class="stampregen" data-regen title="スタンプ文言・色を再生成">🔄</button>
+      <button type="button" class="stampregen" data-regen title="スタンプ文言・色を再生成"><span class="icon">${ICON.refresh}</span></button>
     </div>
     <label class="lbl">スタンプ色</label>
     ${colorPills('stamp_color', OPTIONS.stamp_colors, s.stamp_color)}
@@ -497,6 +542,7 @@ $('#exportBtn').addEventListener('click', () => {
 });
 
 loadOptions();
+restoreJobs();
 </script>
 </body>
 </html>
