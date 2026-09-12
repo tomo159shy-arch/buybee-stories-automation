@@ -41,35 +41,43 @@
 
   .nav{
     position:sticky;top:0;z-index:20;
-    background:color-mix(in srgb,var(--bg) 82%,transparent);
-    -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
-    border-bottom:.5px solid var(--sep);
+    background:var(--surface);
+    border-bottom:1px solid rgba(0,0,0,.06);
+    box-shadow:0 2px 8px rgba(0,0,0,.04);
   }
-  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:44px}
-  .nav-brand{font-size:16px;font-weight:590;letter-spacing:-.02em}
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:48px}
+  .nav-brand{font-size:16px;font-weight:700;letter-spacing:-.02em}
 
-  .largetitle{padding:14px 0 6px}
-  h1{margin:0;font-size:32px;line-height:1.13;font-weight:700;letter-spacing:-.02em}
-  .sub{margin:4px 0 0;color:var(--label-2);font-size:15px;letter-spacing:-.01em}
+  .hero{
+    background:linear-gradient(135deg,#FFE066 0%,#FFD60A 55%,#FFC300 100%);
+    border-radius:24px;padding:26px 22px;margin:18px 0 8px;
+    box-shadow:0 12px 28px rgba(255,198,0,.35);
+  }
+  .hero .icon{font-size:38px;display:block;margin-bottom:6px}
+  .hero h1{margin:0;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-.02em;color:#1c1c1e}
+  .hero .sub{margin:6px 0 0;color:rgba(28,28,30,.72);font-size:14.5px;letter-spacing:-.01em}
 
   main{padding-bottom:120px}
-  .section-t{font-size:13px;font-weight:590;color:var(--label-2);letter-spacing:-.01em;margin:22px 2px 8px}
+  .section-t{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;
+    color:var(--label);letter-spacing:-.01em;margin:26px 2px 10px}
+  .section-t::before{content:'';width:4px;height:15px;border-radius:2px;background:var(--brand);flex:none}
 
-  .card{background:var(--surface);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,0,0,.05);
-    padding:16px;margin-bottom:12px}
-  @media (prefers-color-scheme:dark){.card{box-shadow:none}}
+  .card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:20px;
+    box-shadow:0 8px 20px rgba(0,0,0,.06);padding:16px;margin-bottom:12px}
+  @media (prefers-color-scheme:dark){.card{box-shadow:none;border-color:var(--sep)}}
 
-  .drop{border:1.5px dashed var(--label-3);border-radius:var(--r-ctl);background:var(--fill-1);
-    padding:28px 16px;text-align:center;cursor:pointer;color:var(--label-2);font-size:15px}
+  .drop{border:2px dashed #ffc300;border-radius:20px;background:rgba(255,214,10,.10);
+    padding:30px 16px;text-align:center;cursor:pointer;color:var(--label-2);font-size:15px}
   .drop input{display:none}
-  .drop b{color:var(--label);font-weight:600}
+  .drop .dicon{font-size:32px;display:block;margin-bottom:6px}
+  .drop b{color:var(--label);font-weight:700}
 
   .pillrow{display:flex;flex-wrap:wrap;gap:8px}
-  .pill{cursor:pointer;border:0;background:var(--fill-1);color:var(--label);
-    font-size:14px;font-weight:510;letter-spacing:-.01em;padding:9px 14px;border-radius:980px;
+  .pill{cursor:pointer;border:0;background:rgba(255,214,10,.14);color:#6b5400;
+    font-size:14px;font-weight:700;letter-spacing:-.01em;padding:9px 14px;border-radius:980px;
     transition:background .14s ease,color .14s ease,transform .1s var(--ease)}
   .pill:active{transform:scale(.96)}
-  .pill.on{background:var(--label);color:var(--bg)}
+  .pill.on{background:var(--brand);color:#1c1c1e;box-shadow:0 4px 12px rgba(255,214,10,.5)}
 
   label.lbl{display:block;font-size:13px;font-weight:590;color:var(--label-2);letter-spacing:-.01em;margin:14px 0 6px}
   .inp{width:100%;border:0;background:var(--fill-1);color:var(--label);
@@ -77,27 +85,35 @@
   .inp:focus{box-shadow:inset 0 0 0 2px var(--tint)}
   textarea.inp{resize:vertical;line-height:1.4;min-height:64px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .row3{display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:end}
+  .row3{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+  .swatch-pill{display:inline-flex;align-items:center;gap:6px}
+  .swatch-pill .dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex:none}
 
-  .btn{border:0;cursor:pointer;font-size:16px;font-weight:640;letter-spacing:-.015em;
-    padding:13px 16px;border-radius:var(--r-ctl);transition:transform .12s var(--ease),filter .15s ease;
-    height:46px}
+  .btn{border:0;cursor:pointer;font-size:16px;font-weight:700;letter-spacing:-.015em;
+    padding:13px 16px;border-radius:16px;transition:transform .12s var(--ease),filter .15s ease;
+    height:48px}
   .btn:active{transform:scale(.98)}
-  .btn-primary{background:var(--brand);color:var(--brand-ink)}
+  .btn-primary{background:var(--brand);color:var(--brand-ink);box-shadow:0 8px 20px rgba(255,198,0,.45)}
   .btn-primary:active{filter:brightness(.94)}
-  .btn-plain{background:var(--fill-1);color:var(--label)}
+  .btn-plain{background:var(--fill-1);color:var(--label);box-shadow:none}
   .btn-block{width:100%}
-  .btn[disabled]{opacity:.4;pointer-events:none}
+  .btn[disabled]{opacity:.4;pointer-events:none;box-shadow:none}
 
-  .jobcard{background:var(--surface);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,0,0,.05);
-    margin-bottom:14px;overflow:hidden}
-  @media (prefers-color-scheme:dark){.jobcard{box-shadow:none}}
-  .jobhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;gap:8px}
-  .jobhead .name{font-weight:640;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .jobhead .status{font-size:12px;color:var(--label-2);flex:none}
+  .jobcard{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:20px;
+    box-shadow:0 8px 20px rgba(0,0,0,.06);margin-bottom:14px;overflow:hidden}
+  @media (prefers-color-scheme:dark){.jobcard{box-shadow:none;border-color:var(--sep)}}
+  .jobhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;gap:8px;
+    background:rgba(255,214,10,.10)}
+  .jobhead .name{font-weight:700;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jobhead .status{font-size:12px;font-weight:600;color:#6b5400;flex:none;background:rgba(255,214,10,.25);
+    padding:3px 10px;border-radius:980px}
   .jobbody{padding:0 16px 16px}
   .scenetabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none}
   .scenetabs::-webkit-scrollbar{display:none}
+
+  .urlbox{background:rgba(10,132,255,.07);border:1px solid rgba(10,132,255,.18);border-radius:16px;
+    padding:14px}
+  .urlbox-label{font-weight:700;font-size:14.5px;color:var(--label)}
 
   .checkrow{display:flex;align-items:center;gap:8px;margin:14px 0 4px;font-size:14px;color:var(--label-2)}
   .checkrow input{width:18px;height:18px;accent-color:var(--brand)}
@@ -105,8 +121,8 @@
   .rangewrap{margin:14px 0 4px}
   input[type=range]{width:100%;accent-color:var(--brand)}
 
-  .stampregen{display:flex;align-items:center;justify-content:center;background:var(--fill-1);
-    color:var(--label);border-radius:var(--r-field);cursor:pointer;font-size:13px;height:46px;width:46px;flex:none}
+  .stampregen{display:flex;align-items:center;justify-content:center;background:rgba(255,214,10,.18);
+    color:#6b5400;border-radius:var(--r-field);cursor:pointer;font-size:16px;height:46px;width:46px;flex:none}
 
   video{width:100%;border-radius:var(--r-ctl);background:#000;display:block;margin-top:12px}
 
@@ -121,10 +137,10 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   .dock{position:fixed;left:0;right:0;bottom:0;z-index:30;
-    padding:8px 16px calc(10px + env(safe-area-inset-bottom));
-    background:color-mix(in srgb,var(--bg) 80%,transparent);
-    -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
-    border-top:.5px solid var(--sep)}
+    padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+    background:var(--surface);
+    border-top:1px solid rgba(0,0,0,.08);
+    box-shadow:0 -4px 16px rgba(0,0,0,.06)}
   .dock button{width:100%;max-width:520px;margin:0 auto;display:flex}
   .dock[hidden]{display:none}
 </style>
@@ -137,7 +153,8 @@
 </header>
 
 <main class="wrap">
-  <div class="largetitle">
+  <div class="hero">
+    <span class="icon">🛋️</span>
     <h1>Stories 自動生成</h1>
     <p class="sub">動画をアップロードすると、シーンごとにGeminiが説明文とスタンプを生成し、Stories用の動画に焼き込みます。</p>
   </div>
@@ -145,7 +162,7 @@
   <div class="section-t">動画をアップロード（複数可）</div>
   <label class="drop" id="dropzone">
     <input type="file" id="fileInput" multiple accept="video/mp4,video/quicktime,video/x-msvideo">
-    <div>📹 タップして動画を選択<br><b>MP4 / MOV / AVI</b></div>
+    <span class="dicon">📹</span>タップして動画を選択<br><b>MP4 / MOV / AVI</b>
   </label>
 
   <div id="styleSection" hidden>
@@ -319,8 +336,11 @@ function jobCard(job){
   let body = '<div class="jobbody">';
 
   if (job.status === 'uploaded'){
-    body += `<label class="lbl">商品URL（任意・ページの情報も加味します）</label>
-      <input class="inp" placeholder="https://..." value="${esc(job.url)}" data-role="url">`;
+    body += `<div class="urlbox">
+      <div class="urlbox-label">🔗 商品ページのURL（任意）</div>
+      <div class="muted" style="margin:2px 0 8px">貼ると、ページの情報も見た目と合わせて説明文に反映します</div>
+      <input class="inp" placeholder="https://..." value="${esc(job.url)}" data-role="url">
+    </div>`;
   }
 
   if (job.error){
@@ -384,6 +404,20 @@ function jobCard(job){
   return el;
 }
 
+const shortLabel = s => s.split('（')[0];
+
+function colorPills(fieldName, colors, current){
+  return `<div class="pillrow" data-pillgroup="${fieldName}">${colors.map(c => `
+    <button type="button" class="pill swatch-pill${c.name===current?' on':''}" data-value="${esc(c.name)}">
+      <span class="dot" style="background:${c.hex}"></span>${esc(c.name)}
+    </button>`).join('')}</div>`;
+}
+
+function fontPills(fieldName, fonts, current){
+  return `<div class="pillrow" data-pillgroup="${fieldName}">${fonts.map(f => `
+    <button type="button" class="pill${f===current?' on':''}" data-value="${esc(f)}">${esc(shortLabel(f))}</button>`).join('')}</div>`;
+}
+
 function sceneForm(job, i){
   const s = job.scenes[i];
   const hashtags = Array.isArray(s.hashtags) ? s.hashtags.join(' ') : (s.hashtags || '');
@@ -399,28 +433,32 @@ function sceneForm(job, i){
     <input class="inp" data-f="hashtags" value="${esc(hashtags)}">
     <label class="lbl">文字の大きさ</label>
     <div class="rangewrap"><input type="range" min="0.6" max="1.6" step="0.1" value="${s.text_scale}" data-f="text_scale"></div>
-    <div class="row2">
-      <div><label class="lbl">フォント</label>
-        <select class="inp" data-f="font_choice">${OPTIONS.fonts.map(f=>`<option ${f===s.font_choice?'selected':''}>${esc(f)}</option>`).join('')}</select>
-      </div>
-      <div><label class="lbl">文字の色</label>
-        <select class="inp" data-f="text_color">${OPTIONS.text_colors.map(c=>`<option ${c===s.text_color?'selected':''}>${esc(c)}</option>`).join('')}</select>
-      </div>
-    </div>
+    <label class="lbl">フォント</label>
+    ${fontPills('font_choice', OPTIONS.fonts, s.font_choice)}
+    <label class="lbl">文字の色</label>
+    ${colorPills('text_color', OPTIONS.text_colors, s.text_color)}
+    <label class="lbl">スタンプ文言</label>
     <div class="row3">
-      <div><label class="lbl">スタンプ文言</label>
-        <input class="inp" data-f="stamp_text" value="${esc(s.stamp_text)}"></div>
-      <div><label class="lbl">スタンプ色</label>
-        <select class="inp" data-f="stamp_color">${OPTIONS.stamp_colors.map(c=>`<option ${c===s.stamp_color?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-      <div><label class="lbl">&nbsp;</label>
-        <button type="button" class="stampregen" data-regen title="スタンプを再生成">🔄</button></div>
+      <input class="inp" data-f="stamp_text" value="${esc(s.stamp_text)}">
+      <button type="button" class="stampregen" data-regen title="スタンプ文言・色を再生成">🔄</button>
     </div>
+    <label class="lbl">スタンプ色</label>
+    ${colorPills('stamp_color', OPTIONS.stamp_colors, s.stamp_color)}
   `;
 }
 
 function wireSceneForm(el, job){
   const i = job.activeScene;
   if (!job.scenes || !job.scenes[i]) return;
+  el.querySelectorAll('[data-pillgroup]').forEach(group => {
+    const key = group.dataset.pillgroup;
+    group.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        sceneField(job, i, key, btn.dataset.value);
+        renderJobs();
+      });
+    });
+  });
   el.querySelectorAll('[data-f]').forEach(input => {
     const key = input.dataset.f;
     const handler = () => {

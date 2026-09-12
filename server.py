@@ -167,8 +167,8 @@ def get_options():
     return {
         "styles": list(STYLE_PRESETS.keys()),
         "fonts": list(FONT_OPTIONS.keys()),
-        "text_colors": list(TEXT_COLORS.keys()),
-        "stamp_colors": list(STAMP_COLORS.keys()),
+        "text_colors": [{"name": k, "hex": v} for k, v in TEXT_COLORS.items()],
+        "stamp_colors": [{"name": k, "hex": v} for k, v in STAMP_COLORS.items()],
         "style_ratings": [
             {"name": name, "avg": avg, "n": n}
             for name, (avg, n) in style_average_ratings().items()
