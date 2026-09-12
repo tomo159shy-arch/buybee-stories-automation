@@ -427,7 +427,8 @@ function jobCard(job){
     body += `<div class="urlbox">
       <div class="urlbox-label"><span class="icon">${ICON.link}</span>商品ページのURL（任意）</div>
       <div class="muted" style="margin:2px 0 8px">貼ると、ページの情報も見た目と合わせて説明文に反映します</div>
-      <input class="inp" placeholder="https://..." value="${esc(job.url)}" data-role="url">
+      <input class="inp" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
+        autocomplete="url" spellcheck="false" placeholder="https://..." value="${esc(job.url)}" data-role="url">
     </div>`;
   }
 
@@ -508,7 +509,6 @@ function fontPills(fieldName, fonts, current){
 
 function sceneForm(job, i){
   const s = job.scenes[i];
-  const hashtags = Array.isArray(s.hashtags) ? s.hashtags.join(' ') : (s.hashtags || '');
   return `
     <div class="checkrow"><input type="checkbox" data-f="skip" ${s.skip?'checked':''}> このシーンにはテロップ・スタンプを入れない</div>
     <label class="lbl">キャッチコピー</label>
@@ -517,8 +517,6 @@ function sceneForm(job, i){
     <textarea class="inp" data-f="body">${esc(s.body)}</textarea>
     <label class="lbl">価格</label>
     <input class="inp" data-f="price" value="${esc(s.price)}">
-    <label class="lbl">ハッシュタグ</label>
-    <input class="inp" data-f="hashtags" value="${esc(hashtags)}">
     <label class="lbl">文字の大きさ</label>
     <div class="rangewrap"><input type="range" min="0.6" max="1.6" step="0.1" value="${s.text_scale}" data-f="text_scale"></div>
     <label class="lbl">フォント</label>
@@ -572,7 +570,7 @@ function wireSceneForm(el, job){
 $('#exportBtn').addEventListener('click', () => {
   const parts = jobs.map(job => {
     const scenes = (job.scenes || []).filter(s => !s.skip).map((s, i) =>
-      `[シーン${i+1}]\n${s.title||''}\n${s.body||''}\n${s.price||''}\n${Array.isArray(s.hashtags)?s.hashtags.join(' '):(s.hashtags||'')}`
+      `[シーン${i+1}]\n${s.title||''}\n${s.body||''}\n${s.price||''}`
     ).join('\n\n');
     return `=== ${job.name} ===\n${scenes}`;
   });

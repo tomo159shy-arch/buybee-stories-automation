@@ -120,8 +120,12 @@ def style_average_ratings():
         s["n"] += 1
     return {k: (v["sum"] / v["n"], v["n"]) for k, v in stats.items()}
 
-OUT_W, OUT_H = 1080, 1920
-MAX_SCENES = 5
+OUT_W, OUT_H = 720, 1280
+# 元のデザインは1080x1920基準。Renderの無料枠(メモリ512MB)でffmpegの
+# エンコードがOOM Killされたため解像度を下げた。文字サイズ等の絶対値は
+# この係数で比例縮小して見た目を維持する。
+REF_SCALE = OUT_W / 1080
+MAX_SCENES = 2
 MIN_SCENE_SEC = 1.5
 
 
@@ -229,7 +233,9 @@ def contrast_stroke(fill_color):
     return "white" if fill_color.lstrip("#").lower() in ("111111", "000000") else "black"
 
 
-def draw_stroked_text(draw, pos, text, font, fill="white", stroke_fill="black", stroke_width=7):
+def draw_stroked_text(draw, pos, text, font, fill="white", stroke_fill="black", stroke_width=None):
+    if stroke_width is None:
+        stroke_width = max(int(7 * REF_SCALE), 2)
     draw.text(pos, text, font=font, fill=fill, stroke_width=stroke_width, stroke_fill=stroke_fill)
 
 
@@ -239,6 +245,7 @@ def build_text_overlay(title, body, price, zone="top", scale=1.0, font_path=FONT
     (画面上部が込んでいるシーンでは中段寄りに下げる)。価格は常に左下。
     scaleは文字サイズの倍率、font_path/text_colorはフォントと文字色
     (いずれもシーンごとに変えられる)。"""
+    scale = scale * REF_SCALE
     canvas = Image.new("RGBA", (OUT_W, OUT_H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     title_font = ImageFont.truetype(font_path, max(int(76 * scale), 10))
@@ -246,10 +253,10 @@ def build_text_overlay(title, body, price, zone="top", scale=1.0, font_path=FONT
     price_font = ImageFont.truetype(font_path, max(int(64 * scale), 10))
     stroke_color = contrast_stroke(text_color)
 
-    pad_x = 56
+    pad_x = int(56 * REF_SCALE)
     max_w = OUT_W - pad_x * 2
 
-    y = 150 if zone == "top" else int(OUT_H * 0.40)
+    y = int(150 * REF_SCALE) if zone == "top" else int(OUT_H * 0.40)
 
     if title:
         for line in wrap_text(draw, title, title_font, max_w):
@@ -264,7 +271,7 @@ def build_text_overlay(title, body, price, zone="top", scale=1.0, font_path=FONT
                 y += int(70 * scale)
 
     if price:
-        price_y = OUT_H - 300
+        price_y = OUT_H - int(300 * REF_SCALE)
         draw_stroked_text(draw, (pad_x, price_y), price, price_font, fill=text_color, stroke_fill=stroke_color)
 
     return canvas
@@ -274,26 +281,32 @@ def build_stamp(stamp_text, color_name, corner="top-right", font_path=FONT_BOLD)
     """ピンクの「NEW」のような、マーカーで書いたワンポイントスタンプ風の文字画像。
     cornerに応じて傾きの向きを変える(隅に向かって傾く自然な見た目にする)。"""
     color = STAMP_COLORS.get(color_name, STAMP_COLORS["ピンク"])
-    font_size = 130
+    font_size = max(int(130 * REF_SCALE), 10)
     font = ImageFont.truetype(font_path, font_size)
 
     probe = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     text_w = probe.textlength(stamp_text, font=font)
-    canvas_w, canvas_h = int(text_w) + 100, int(font_size * 1.5)
+    pad = int(100 * REF_SCALE)
+    canvas_w, canvas_h = int(text_w) + pad, int(font_size * 1.5)
 
     badge = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(badge)
-    draw_stroked_text(draw, (50, 20), stamp_text, font, fill=color, stroke_fill="white", stroke_width=8)
+    draw_stroked_text(
+        draw, (int(50 * REF_SCALE), int(20 * REF_SCALE)), stamp_text, font,
+        fill=color, stroke_fill="white", stroke_width=max(int(8 * REF_SCALE), 2),
+    )
 
     angle = -10 if corner == "top-right" else 10
     return badge.rotate(angle, expand=True, resample=Image.BICUBIC)
 
 
-def stamp_target_position(stamp_img, corner="top-right", text_zone="middle", margin_x=50):
+def stamp_target_position(stamp_img, corner="top-right", text_zone="middle", margin_x=None):
     """text_zoneが"top"(キャッチコピーが上部に来る)場合は、スタンプを
     もう少し下げてタイトルとの重なりを避ける。"""
+    if margin_x is None:
+        margin_x = int(50 * REF_SCALE)
     w, _ = stamp_img.size
-    margin_y = 320 if text_zone == "top" else 90
+    margin_y = int(320 * REF_SCALE) if text_zone == "top" else int(90 * REF_SCALE)
     if corner == "top-right":
         return OUT_W - w - margin_x, margin_y
     return margin_x, margin_y
@@ -364,7 +377,10 @@ def burn_video_scenes(video_path, scenes, out_path):
         "-filter_complex", filter_complex,
         "-map", f"[{prev_label}]",
         "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        # threads/preset: Renderの無料枠(メモリ512MB)でOOM Killされたため、
+        # 画質より省メモリを優先(スレッド数を絞るとx264の内部バッファも減る)。
+        "-threads", "1",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac",
         "-shortest",
         out_path,
