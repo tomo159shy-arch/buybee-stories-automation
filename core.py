@@ -315,12 +315,39 @@ def stamp_target_position(stamp_img, corner="top-right", text_zone="middle", mar
 FADE_SEC = 0.3
 
 
+def normalize_video(video_path, job_dir, timeout=180):
+    """iPhoneの4K/HEVC動画などをそのまま扱うと、シーン分析(OpenCVでの
+    フレーム取得)や最終書き出し(ffmpeg)のデコードだけでメモリを大きく
+    消費し、Render無料枠(512MB)でOOM Killされる原因になる。
+    そこでアップロード直後に一度だけ出力サイズまで軽く変換しておき、
+    以降の処理はすべてこの軽量な動画を使うことでメモリ・処理時間の
+    両方を抑える。変換に失敗した場合は元動画のまま処理を続行する。"""
+    proxy_path = os.path.join(job_dir, "proxy.mp4")
+    cmd = [
+        "ffmpeg", "-y",
+        "-threads", "1", "-i", video_path,
+        "-vf", f"scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,crop={OUT_W}:{OUT_H}",
+        "-map", "0:v:0", "-map", "0:a:0?",
+        "-threads", "1",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+        "-c:a", "aac", "-b:a", "128k",
+        proxy_path,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return video_path
+    if result.returncode != 0 or not os.path.exists(proxy_path):
+        return video_path
+    return proxy_path
+
+
 def burn_video_scenes(video_path, scenes, out_path):
     """scenes: [{start, end, text_img(PIL), stamp_img(PIL), stamp_xy:(x,y)}, ...]
     各シーンのテキスト・スタンプを、境界でふわっとクロスフェードしながら
     その時間帯だけ表示するよう連結する。"""
     tmp_files = []
-    inputs = ["-i", video_path]
+    inputs = ["-threads", "1", "-i", video_path]
     filters = [
         f"[0:v]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,crop={OUT_W}:{OUT_H}[v0]"
     ]

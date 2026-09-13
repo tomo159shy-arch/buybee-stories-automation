@@ -18,7 +18,7 @@ import cv2
 
 from core import (
     STAMP_COLORS, STYLE_PRESETS, FONT_OPTIONS, TEXT_COLORS,
-    detect_scenes, grab_frame_at, analyze_zones,
+    detect_scenes, grab_frame_at, analyze_zones, normalize_video,
     build_text_overlay, build_stamp, stamp_target_position, burn_video_scenes,
     log_feedback, style_average_ratings, shuffle_stamp, fetch_product_page_text,
 )
@@ -176,7 +176,17 @@ def analyze_video_job(job_id, style_key, product_url):
             except Exception as e:
                 job["warning"] = f"商品URL取得に失敗したため、動画のみで分析します: {e}"
 
-        video_path = job["video_path"]
+        # 4K/HEVCなど大きい動画をそのまま扱うとデコードだけでメモリを
+        # 食いRenderの無料枠(512MB)でOOM Killされるため、以降の処理は
+        # すべて出力サイズまで軽くした動画を使う。
+        original_path = job["video_path"]
+        video_path = normalize_video(original_path, job["job_dir"])
+        job["video_path"] = video_path
+        if video_path != original_path:
+            try:
+                os.unlink(original_path)
+            except OSError:
+                pass
         scene_bounds = detect_scenes(video_path)
 
         # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して
