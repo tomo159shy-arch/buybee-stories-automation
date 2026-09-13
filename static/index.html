@@ -159,7 +159,7 @@
 <main class="wrap">
   <div class="largetitle">
     <h1>動画からStoriesを自動生成</h1>
-    <p class="sub">アップロードすると、シーンごとにGeminiが説明文とスタンプを作り、動画に焼き込みます。</p>
+    <p class="sub">動画とURLを貼ると、あとは自動。Geminiが説明文とスタンプを作り、そのまま動画に焼き込みます。</p>
   </div>
 
   <div id="pushBanner" style="text-align:center;margin-bottom:8px" hidden>
@@ -172,7 +172,14 @@
     <span id="dropContent"><span class="icon dicon" id="dropIcon"></span>タップして動画を選択<br><b>MP4 / MOV / AVI</b></span>
   </label>
 
-  <div id="styleSection" hidden>
+  <div class="urlbox" style="margin-top:10px">
+    <div class="urlbox-label"><span class="icon" id="urlIcon"></span>商品ページのURL（任意）</div>
+    <div class="muted" style="margin:2px 0 8px">動画と一緒に貼っておくと、説明文に自動で反映されます</div>
+    <input class="inp" id="initialUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
+      autocomplete="url" spellcheck="false" placeholder="https://...">
+  </div>
+
+  <div id="styleSection">
     <div class="section-t">テロップの雰囲気</div>
     <div class="pillrow" id="stylePills"></div>
     <div id="ratingHint" class="muted" style="margin-top:8px"></div>
@@ -314,6 +321,7 @@ function renderColorPills(){
 
 const dropDefaultHTML = () => `<span class="icon dicon" id="dropIcon">${ICON.video}</span>タップして動画を選択<br><b>MP4 / MOV / AVI</b>`;
 $('#dropContent').innerHTML = dropDefaultHTML();
+$('#urlIcon').innerHTML = ICON.link;
 $('#exportBtn').innerHTML = `<span class="icon">${ICON.doc}</span>説明文をテキストで保存（全動画分）`;
 
 function uploadWithProgress(files, onProgress){
@@ -337,17 +345,20 @@ function uploadWithProgress(files, onProgress){
 $('#fileInput').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
+  const urlValue = $('#initialUrl').value.trim();
   const content = $('#dropContent');
   content.innerHTML = '<span class="spinner"></span>アップロード中… 0%';
   try {
     const res = await uploadWithProgress(files, (pct) => {
       content.innerHTML = `<span class="spinner"></span>アップロード中… ${pct}%`;
     });
-    res.jobs.forEach(j => jobs.push({ id:j.id, name:j.name, status:'uploaded', scenes:null, activeScene:0, url:'', warning:null, error:null }));
-    $('#styleSection').hidden = false;
+    const newJobs = res.jobs.map(j => ({ id:j.id, name:j.name, status:'uploaded', scenes:null, activeScene:0, url:urlValue, warning:null, error:null }));
+    newJobs.forEach(j => jobs.push(j));
     saveJobIds();
     renderJobs();
     updateDock();
+    $('#initialUrl').value = '';
+    autoRun(newJobs);
   } catch (err) {
     alert('アップロードに失敗しました: ' + err.message);
   } finally {
@@ -406,30 +417,6 @@ function updateDock(){
   }
 }
 
-async function analyzeAll(){
-  for (const job of jobs){
-    job.status = 'analyzing';
-  }
-  renderJobs(); updateDock();
-  await Promise.all(jobs.map(async job => {
-    try {
-      const fd = new FormData();
-      fd.append('style_key', selectedStyle);
-      fd.append('product_url', job.url || '');
-      await api(`/api/jobs/${job.id}/analyze`, { method:'POST', body: fd });
-      await pollJob(job);
-      if (job.scenes) {
-        job.scenes.forEach(s => { s.font_choice = selectedFont; s.text_color = selectedTextColor; });
-        await flushSync(job);
-      }
-    } catch (e) {
-      job.status = 'error'; job.error = e.message;
-    }
-  }));
-  renderJobs(); updateDock();
-  $('#exportSection').hidden = false;
-}
-
 async function pollJob(job){
   while (true){
     const data = await api(`/api/jobs/${job.id}`);
@@ -439,24 +426,58 @@ async function pollJob(job){
   }
 }
 
-async function renderAll(){
-  for (const job of jobs) job.status = 'rendering';
+async function analyzeJob(job){
+  job.status = 'analyzing';
   renderJobs(); updateDock();
-  await Promise.all(jobs.map(async job => {
-    try {
+  try {
+    const fd = new FormData();
+    fd.append('style_key', selectedStyle);
+    fd.append('product_url', job.url || '');
+    await api(`/api/jobs/${job.id}/analyze`, { method:'POST', body: fd });
+    await pollJob(job);
+    if (job.scenes) {
+      job.scenes.forEach(s => { s.font_choice = selectedFont; s.text_color = selectedTextColor; });
       await flushSync(job);
-      await api(`/api/jobs/${job.id}/render`, { method:'POST' });
-      await pollJob(job);
-    } catch (e) {
-      job.status = 'error'; job.error = e.message;
     }
-  }));
+  } catch (e) {
+    job.status = 'error'; job.error = e.message;
+  }
   renderJobs(); updateDock();
-  const firstDone = jobs.find(j => j.status === 'done');
-  if (firstDone) {
-    const el = document.getElementById(`video-${firstDone.id}`);
+}
+
+async function renderJob(job){
+  job.status = 'rendering';
+  renderJobs(); updateDock();
+  try {
+    await flushSync(job);
+    await api(`/api/jobs/${job.id}/render`, { method:'POST' });
+    await pollJob(job);
+  } catch (e) {
+    job.status = 'error'; job.error = e.message;
+  }
+  renderJobs(); updateDock();
+  if (job.status === 'done'){
+    const el = document.getElementById(`video-${job.id}`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+}
+
+// アップロード直後に呼ばれ、分析→書き出しまで人の手を挟まず自動で進める
+async function autoRun(newJobs){
+  await Promise.all(newJobs.map(async job => {
+    await analyzeJob(job);
+    if (job.status === 'analyzed') await renderJob(job);
+  }));
+  $('#exportSection').hidden = false;
+}
+
+async function analyzeAll(){
+  await Promise.all(jobs.filter(j => j.status === 'uploaded' || j.status === 'error').map(analyzeJob));
+  $('#exportSection').hidden = false;
+}
+
+async function renderAll(){
+  await Promise.all(jobs.map(renderJob));
 }
 
 const syncTimers = {};
