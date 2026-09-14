@@ -471,42 +471,46 @@ function updateDock(){
 // 自動で続ける(画面を閉じていても最後まで完成させるため)ので、ここでは
 // 'done'/'error'になるまで待てば良い。
 async function pollJob(job){
-  while (true){
-    const data = await api(`/api/jobs/${job.id}`);
-    job.status = data.status; job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
-    job.progress = data.progress;
-    renderJobs(); updateDock();
-    if (['done','error'].includes(data.status)) return data;
-    await new Promise(r => setTimeout(r, 1500));
-  }
+  return waitUntilSettled(job);
 }
 
-// 分析/書き出しのリクエスト自体がサーバー側で完了まで待つ作りになっている
-// (Cloud Runでバックグラウンド処理のCPUが確保されない問題への対策)ため、
-// そのリクエストが終わるまでの間、進捗%だけ別リクエストで裏から取りに行く。
-function startProgressPolling(job){
-  let stopped = false;
-  const loop = (async () => {
-    while (!stopped){
-      try {
-        const data = await api(`/api/jobs/${job.id}`);
-        job.status = data.status; job.progress = data.progress;
-        job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
+// サーバー側は同期的に(書き出しまで)処理するため、モバイルSafari等で
+// 画面を離れたりスリープしたりすると、POSTの接続自体が"Load failed"の
+// ような通信エラーで切れることがある。ただしこれはブラウザ側の接続が
+// 切れただけで、サーバー側の処理は裏で続いている可能性が高い。
+// なので接続エラーだけで即「失敗」と決めず、実際のジョブ状態を
+// 確認できるまでポーリングし続け、サーバーが本当にdone/errorを
+// 返すまで諦めない。一時的な通信断(最大20回=約1分)は無視してリトライする。
+async function waitUntilSettled(job){
+  let fails = 0;
+  while (true){
+    try {
+      const data = await api(`/api/jobs/${job.id}`);
+      job.status = data.status; job.progress = data.progress;
+      job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
+      renderJobs(); updateDock();
+      fails = 0;
+      if (['done','error'].includes(job.status)) return data;
+    } catch (e) {
+      fails++;
+      if (fails >= 20){
+        job.status = 'error';
+        job.error = '通信状態が悪く状態を確認できませんでした。電波の良い場所でこの画面をもう一度開いてみてください。';
         renderJobs(); updateDock();
-      } catch (e) { /* 一時的な通信エラーは無視して次回に回す */ }
-      await new Promise(r => setTimeout(r, 1200));
+        return null;
+      }
     }
-  })();
-  return () => { stopped = true; };
+    await new Promise(r => setTimeout(r, 3000));
+  }
 }
 
 // 分析~書き出しはサーバー側で自動連携される(このPOST自体が完了まで
 // 待つ作りになっている)。画面を閉じても(プッシュ通知が有効なら)
-// 完成時に通知が来る。POST中は別リクエストで進捗%だけ裏から取りに行く。
+// 完成時に通知が来る。POSTの接続が途中で切れても、下のポーリングが
+// 実際のジョブ状態を確認し続けるので大丈夫。
 async function analyzeJob(job){
   job.status = 'analyzing'; job.progress = 0;
   renderJobs(); updateDock();
-  const stopPolling = startProgressPolling(job);
   try {
     const fd = new FormData();
     fd.append('style_key', selectedStyle);
@@ -514,14 +518,8 @@ async function analyzeJob(job){
     fd.append('font_choice', selectedFont || '');
     fd.append('text_color', selectedTextColor || '');
     await api(`/api/jobs/${job.id}/analyze`, { method:'POST', body: fd });
-    const data = await api(`/api/jobs/${job.id}`);
-    job.status = data.status; job.progress = data.progress;
-    job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
-  } catch (e) {
-    job.status = 'error'; job.error = e.message;
-  } finally {
-    stopPolling();
-  }
+  } catch (e) { /* 接続エラーは無視。下のポーリングで本当の状態を確認する */ }
+  await waitUntilSettled(job);
   renderJobs(); updateDock();
   if (job.status === 'done'){
     const el = document.getElementById(`video-${job.id}`);
@@ -534,18 +532,11 @@ async function analyzeJob(job){
 async function renderJob(job){
   job.status = 'rendering'; job.progress = 55;
   renderJobs(); updateDock();
-  const stopPolling = startProgressPolling(job);
   try {
     await flushSync(job);
     await api(`/api/jobs/${job.id}/render`, { method:'POST' });
-    const data = await api(`/api/jobs/${job.id}`);
-    job.status = data.status; job.progress = data.progress;
-    job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
-  } catch (e) {
-    job.status = 'error'; job.error = e.message;
-  } finally {
-    stopPolling();
-  }
+  } catch (e) { /* 接続エラーは無視。下のポーリングで本当の状態を確認する */ }
+  await waitUntilSettled(job);
   renderJobs(); updateDock();
   if (job.status === 'done'){
     const el = document.getElementById(`video-${job.id}`);
