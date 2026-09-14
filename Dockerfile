@@ -12,4 +12,6 @@ COPY . .
 
 ENV PORT=8000
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT}"]
+# Cloud RunでHTTP/1だとリクエストボディが32MBに制限され、動画アップロードで
+# 413になる。HTTP/2(h2c)で受けるためuvicornではなくhypercornを使う。
+CMD ["sh", "-c", "hypercorn server:app --bind 0.0.0.0:${PORT}"]
