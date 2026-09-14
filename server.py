@@ -20,7 +20,7 @@ import cv2
 
 from core import (
     STAMP_COLORS, STYLE_PRESETS, FONT_OPTIONS, TEXT_COLORS,
-    detect_scenes, grab_frame_at, analyze_zones, make_scene_probe, probe_duration,
+    detect_scenes, grab_frame_at, analyze_zones, probe_duration,
     build_text_overlay, build_stamp, stamp_target_position, burn_video_scenes,
     log_feedback, style_average_ratings, shuffle_stamp, fetch_product_page_text,
 )

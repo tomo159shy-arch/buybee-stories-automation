@@ -334,32 +334,6 @@ def stamp_target_position(stamp_img, corner="top-right", text_zone="middle", mar
 FADE_SEC = 0.3
 
 
-def make_scene_probe(video_path, job_dir, timeout=60):
-    """シーンの切れ目検出(detect_scenes)専用の、思い切り軽い低解像度・
-    無音のプレビューを作る。切れ目検出の精度は解像度に依存しないので、
-    ここは速度だけを優先する。Cloud Run(2GB/2CPU)移行後は最終書き出し
-    自体は元動画を直接使える(burn_video_scenes側のscaleフィルタで
-    縮小されるので二重変換にならない)ため、この軽いプローブだけ作れば
-    十分。変換に失敗した場合は元動画のまま処理を続行する。"""
-    probe_path = os.path.join(job_dir, "scene_probe.mp4")
-    cmd = [
-        "ffmpeg", "-y",
-        "-threads", "2", "-i", video_path,
-        "-vf", "scale=320:-2",
-        "-an",
-        "-threads", "2",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
-        probe_path,
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return video_path
-    if result.returncode != 0 or not os.path.exists(probe_path):
-        return video_path
-    return probe_path
-
-
 def _parse_hms(s):
     try:
         h, m, sec = s.split(":")
