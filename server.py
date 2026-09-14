@@ -249,6 +249,12 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
             if last_error is not None:
                 warnings.append(str(last_error))
             if scene is not None:
+                # フレーム取得自体は成功したが、Gemini分析が(リトライも含め)
+                # 全て失敗し、title/bodyが1つも取れなかった場合。このまま
+                # 書き出すとテキストが空欄のまま動画だけ完成してしまうので、
+                # 「テロップなしでそのまま動画を使う」扱いに切り替える。
+                if not scene.get("title") and not scene.get("body"):
+                    scene["skip"] = True
                 scenes.append(scene)
         if warnings:
             job["warning"] = "シーン分析に失敗しました: " + " / ".join(warnings)
