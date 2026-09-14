@@ -24,7 +24,7 @@ from core import (
 )
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-flash-latest"
+GEMINI_MODEL = "gemini-flash-lite-latest"
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
@@ -121,10 +121,11 @@ def ask_gemini(frame_path, style_key, product_context=""):
     raise last_error
 
 
-def analyze_one_scene(job, idx, start, end, style_key, product_context, font_choice, text_color):
+def analyze_one_scene(job, idx, start, end, style_key, product_context, font_choice, text_color, frame_source_path):
     """1シーン分の代表フレーム抽出+Gemini分析。シーン間で並列実行できるよう
-    副作用(ファイル保存)以外は全部この関数の中で完結させている。"""
-    video_path = job["video_path"]
+    副作用(ファイル保存)以外は全部この関数の中で完結させている。
+    frame_source_path: 値札等の文字を正確に読めるよう、縮小前の元動画を渡す。"""
+    video_path = frame_source_path
     duration = end - start
     candidate_times = [start + duration * r for r in (0.5, 0.25, 0.75)]
     text_zone = stamp_corner = None
@@ -177,19 +178,24 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
             except Exception as e:
                 job["warning"] = f"商品URL取得に失敗したため、動画のみで分析します: {e}"
 
-        # シーン分析(価格タグ等の読み取り)は精度を優先し、元の高解像度
-        # 動画に対して行う。縮小した動画で分析すると細かい文字が読めなく
-        # なるため。メモリの重いデコードが発生する最終書き出し向けの
-        # 軽量プロキシは、分析が終わったこの後で作る。
+        # シーンの切れ目検出は動画全体をフレーム単位で走査するため、
+        # 元の高解像度(4K等)のままだと非常に遅くなる。切れ目検出自体は
+        # 精度に文字の読みやすさは関係ないので、先に軽量プロキシを作り
+        # そちらを使う。一方、Geminiに渡す代表フレーム(値札等を読む部分)
+        # だけは精度優先で元の高解像度から取得する。
         original_path = job["video_path"]
-        scene_bounds = detect_scenes(original_path)
+        proxy_path = normalize_video(original_path, job["job_dir"])
+        scene_bounds = detect_scenes(proxy_path)
 
         # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して
         # 分析時間を短縮する(逐次だとシーン数×待ち時間がそのまま積み上がる)。
         results = [None] * len(scene_bounds)
         with ThreadPoolExecutor(max_workers=max(len(scene_bounds), 1)) as pool:
             futures = {
-                pool.submit(analyze_one_scene, job, idx, start, end, style_key, product_context, font_choice, text_color): idx
+                pool.submit(
+                    analyze_one_scene, job, idx, start, end, style_key, product_context,
+                    font_choice, text_color, original_path,
+                ): idx
                 for idx, (start, end) in enumerate(scene_bounds)
             }
             for future in as_completed(futures):
@@ -206,10 +212,8 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
         if warnings:
             job["warning"] = "シーン分析に失敗しました: " + " / ".join(warnings)
 
-        # 分析が終わったので、最終書き出し(ffmpegのoverlay+encode)専用の
-        # 軽量プロキシに切り替える。元の4K/HEVC動画のままだとそのデコード
-        # だけでメモリを大きく消費するため。
-        proxy_path = normalize_video(original_path, job["job_dir"])
+        # 最終書き出し(ffmpegのoverlay+encode)は軽量プロキシを使う。
+        # 元の4K/HEVC動画のままだとそのデコードだけでメモリを大きく消費するため。
         job["video_path"] = proxy_path
         if proxy_path != original_path:
             try:
