@@ -120,10 +120,10 @@ def style_average_ratings():
         s["n"] += 1
     return {k: (v["sum"] / v["n"], v["n"]) for k, v in stats.items()}
 
-OUT_W, OUT_H = 720, 1280
-# 元のデザインは1080x1920基準。Renderの無料枠(メモリ512MB)でffmpegの
-# エンコードがOOM Killされたため解像度を下げた。文字サイズ等の絶対値は
-# この係数で比例縮小して見た目を維持する。
+OUT_W, OUT_H = 1080, 1920
+# Render無料枠(512MB)時代はOOM対策で720x1280に落としていたが、
+# Cloud Run(2GB)へ移行したので元の解像度に戻した。文字サイズ等の
+# 絶対値はREF_SCALEで比例調整する(今は1.0=無調整)。
 REF_SCALE = OUT_W / 1080
 MAX_SCENES = 2
 MIN_SCENE_SEC = 1.5
@@ -316,20 +316,21 @@ FADE_SEC = 0.3
 
 
 def normalize_video(video_path, job_dir, timeout=180):
-    """iPhoneの4K/HEVC動画などをそのまま扱うと、シーン分析(OpenCVでの
-    フレーム取得)や最終書き出し(ffmpeg)のデコードだけでメモリを大きく
-    消費し、Render無料枠(512MB)でOOM Killされる原因になる。
-    そこでアップロード直後に一度だけ出力サイズまで軽く変換しておき、
-    以降の処理はすべてこの軽量な動画を使うことでメモリ・処理時間の
-    両方を抑える。変換に失敗した場合は元動画のまま処理を続行する。"""
+    """iPhoneの4K/HEVC動画をそのまま最終書き出し(ffmpegのoverlay+encode)に
+    通すと、そのデコード負荷だけでメモリを大きく消費する。シーン分析は
+    (精度のため)元の高解像度動画に対して先に行い、この関数は分析が終わった
+    後、最終書き出し専用の軽量プロキシを作るために呼ぶ。
+    Cloud Run(2GB)移行後はメモリの余裕があるので、プロキシ自体の画質は
+    そこそこ良くしておく(ここで画質を落としすぎると最終書き出しで
+    二重に劣化するため)。変換に失敗した場合は元動画のまま処理を続行する。"""
     proxy_path = os.path.join(job_dir, "proxy.mp4")
     cmd = [
         "ffmpeg", "-y",
-        "-threads", "1", "-i", video_path,
+        "-threads", "2", "-i", video_path,
         "-vf", f"scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,crop={OUT_W}:{OUT_H}",
         "-map", "0:v:0", "-map", "0:a:0?",
-        "-threads", "1",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+        "-threads", "2",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-c:a", "aac", "-b:a", "128k",
         proxy_path,
     ]
@@ -347,7 +348,7 @@ def burn_video_scenes(video_path, scenes, out_path):
     各シーンのテキスト・スタンプを、境界でふわっとクロスフェードしながら
     その時間帯だけ表示するよう連結する。"""
     tmp_files = []
-    inputs = ["-threads", "1", "-i", video_path]
+    inputs = ["-threads", "2", "-i", video_path]
     filters = [
         f"[0:v]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,crop={OUT_W}:{OUT_H}[v0]"
     ]
@@ -407,10 +408,10 @@ def burn_video_scenes(video_path, scenes, out_path):
         # (apacコーデック)のような未対応トラックが混ざっていると全体が失敗する。
         # 最初の音声トラックだけを使う。
         "-map", "0:a:0?",
-        # threads/preset: Renderの無料枠(メモリ512MB)でOOM Killされたため、
-        # 画質より省メモリを優先(スレッド数を絞るとx264の内部バッファも減る)。
-        "-threads", "1",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        # Cloud Run(2GB/2CPU)移行に伴い、Render無料枠向けの省メモリ設定
+        # (threads=1, crf=23)から画質・速度優先の設定に戻した。
+        "-threads", "2",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "20",
         "-c:a", "aac",
         "-shortest",
         out_path,

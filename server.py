@@ -24,7 +24,7 @@ from core import (
 )
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-flash-lite-latest"
+GEMINI_MODEL = "gemini-flash-latest"
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
@@ -176,18 +176,12 @@ def analyze_video_job(job_id, style_key, product_url):
             except Exception as e:
                 job["warning"] = f"商品URL取得に失敗したため、動画のみで分析します: {e}"
 
-        # 4K/HEVCなど大きい動画をそのまま扱うとデコードだけでメモリを
-        # 食いRenderの無料枠(512MB)でOOM Killされるため、以降の処理は
-        # すべて出力サイズまで軽くした動画を使う。
+        # シーン分析(価格タグ等の読み取り)は精度を優先し、元の高解像度
+        # 動画に対して行う。縮小した動画で分析すると細かい文字が読めなく
+        # なるため。メモリの重いデコードが発生する最終書き出し向けの
+        # 軽量プロキシは、分析が終わったこの後で作る。
         original_path = job["video_path"]
-        video_path = normalize_video(original_path, job["job_dir"])
-        job["video_path"] = video_path
-        if video_path != original_path:
-            try:
-                os.unlink(original_path)
-            except OSError:
-                pass
-        scene_bounds = detect_scenes(video_path)
+        scene_bounds = detect_scenes(original_path)
 
         # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して
         # 分析時間を短縮する(逐次だとシーン数×待ち時間がそのまま積み上がる)。
@@ -210,6 +204,17 @@ def analyze_video_job(job_id, style_key, product_url):
                 scenes.append(scene)
         if warnings:
             job["warning"] = "シーン分析に失敗しました: " + " / ".join(warnings)
+
+        # 分析が終わったので、最終書き出し(ffmpegのoverlay+encode)専用の
+        # 軽量プロキシに切り替える。元の4K/HEVC動画のままだとそのデコード
+        # だけでメモリを大きく消費するため。
+        proxy_path = normalize_video(original_path, job["job_dir"])
+        job["video_path"] = proxy_path
+        if proxy_path != original_path:
+            try:
+                os.unlink(original_path)
+            except OSError:
+                pass
 
         job["scenes"] = scenes
         job["style_key"] = style_key
