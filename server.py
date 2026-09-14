@@ -22,7 +22,7 @@ from core import (
     STAMP_COLORS, STYLE_PRESETS, FONT_OPTIONS, TEXT_COLORS,
     detect_scenes, grab_frame_at, analyze_zones, probe_duration,
     build_text_overlay, build_stamp, stamp_target_position, burn_video_scenes,
-    log_feedback, style_average_ratings, shuffle_stamp, fetch_product_page_text,
+    style_average_ratings, shuffle_stamp, fetch_product_page_text,
 )
 import gcs_store
 
@@ -342,7 +342,7 @@ def get_options():
         "stamp_colors": [{"name": k, "hex": v} for k, v in STAMP_COLORS.items()],
         "style_ratings": [
             {"name": name, "avg": avg, "n": n}
-            for name, (avg, n) in style_average_ratings().items()
+            for name, (avg, n) in style_average_ratings(gcs_store.load_feedback()).items()
         ],
         "push_enabled": bool(VAPID_PRIVATE_KEY),
     }
@@ -485,7 +485,7 @@ async def rate(job_id: str, payload: dict):
     job = JOBS.get(job_id)
     if not job:
         raise HTTPException(404, "job not found")
-    log_feedback({
+    gcs_store.append_feedback({
         "timestamp": time.time(),
         "style": job.get("style_key"),
         "rating": payload.get("rating"),

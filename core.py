@@ -111,10 +111,12 @@ def load_feedback():
     return records
 
 
-def style_average_ratings():
-    """スタイルプリセットごとの平均評価と件数を返す。{style: (avg, n)}"""
+def style_average_ratings(records=None):
+    """スタイルプリセットごとの平均評価と件数を返す。{style: (avg, n)}
+    records未指定時はローカルファイルから読む(ローカル実行用)。
+    本番(Cloud Run)ではGCSから読んだ記録を渡して使う。"""
     stats = {}
-    for r in load_feedback():
+    for r in records if records is not None else load_feedback():
         style, rating = r.get("style"), r.get("rating")
         if style is None or rating is None:
             continue

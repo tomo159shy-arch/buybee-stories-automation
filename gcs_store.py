@@ -81,3 +81,26 @@ def load_push_subscriptions():
 def save_push_subscriptions(subs):
     blob = _bucket().blob(PUSH_SUBS_BLOB)
     blob.upload_from_string(json.dumps(subs), content_type="application/json")
+
+
+FEEDBACK_BLOB = "_feedback_log.json"
+
+
+def load_feedback():
+    # core.log_feedbackはコンテナのローカルディスクに書いていたため、
+    # インスタンス再起動のたびに★評価が消えていた(動画・通知購読と同じ
+    # 根本原因)。評価もGCSに永続化する。
+    try:
+        blob = _bucket().blob(FEEDBACK_BLOB)
+        if not blob.exists():
+            return []
+        return json.loads(blob.download_as_text())
+    except Exception:
+        return []
+
+
+def append_feedback(record):
+    records = load_feedback()
+    records.append(record)
+    blob = _bucket().blob(FEEDBACK_BLOB)
+    blob.upload_from_string(json.dumps(records, ensure_ascii=False), content_type="application/json")
