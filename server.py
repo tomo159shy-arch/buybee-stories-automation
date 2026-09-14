@@ -205,34 +205,22 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
             except Exception as e:
                 job["warning"] = f"商品URL取得に失敗したため、動画のみで分析します: {e}"
 
-        # シーンの切れ目検出は動画全体をフレーム単位で走査するため、
-        # 元の高解像度(4K等)のままだと非常に遅くなる。切れ目検出自体は
-        # 精度に文字の読みやすさは関係ないので、思い切り軽いプローブを
-        # 作ってそちらを使う。Geminiに渡す代表フレーム(値札等を読む部分)
-        # だけは精度優先で元の高解像度から取得する。
+        # MAX_SCENES=1(動画全体を通して同じテキスト1つ)にしたので、
+        # detect_scenesは実際にはフレームをスキャンせず、動画の長さだけ
+        # 読んで即座に「動画全体=1シーン」を返す(core.detect_scenes参照)。
+        # そのため軽量プローブ作成やシーン分割スキャンはそもそも不要。
+        # それでも将来MAX_SCENESを増やす場合に備え、タイムアウトの安全装置
+        # (「5%のまま進まない」不具合の原因だった)はそのまま残しておく。
         original_path = job["video_path"]
-        scene_probe_path = make_scene_probe(original_path, job["job_dir"])
-
-        # detect_scenesはffmpeg/requestsのようなタイムアウト機構が無く、
-        # 想定外に大きい/長い動画だと無期限にハングしうる(「5%のまま進まない」
-        # 不具合の原因だった)。30秒でタイムアウトし、動画全体を1シーンとして
-        # 扱うフォールバックに切り替える(タイムアウトさせたスレッドの完了は
-        # 待たない=wait=Falseで、これ自体が処理をブロックしないようにする)。
         probe_pool = ThreadPoolExecutor(max_workers=1)
         try:
-            scene_bounds = probe_pool.submit(detect_scenes, scene_probe_path).result(timeout=30)
+            scene_bounds = probe_pool.submit(detect_scenes, original_path).result(timeout=30)
         except FuturesTimeoutError:
-            duration = probe_duration(scene_probe_path) or probe_duration(original_path) or 10.0
+            duration = probe_duration(original_path) or 10.0
             scene_bounds = [(0.0, duration)]
             job["warning"] = (job.get("warning") or "") + " シーン検出が時間内に終わらなかったため、動画全体を1シーンとして扱いました"
         finally:
             probe_pool.shutdown(wait=False)
-
-        if scene_probe_path != original_path:
-            try:
-                os.unlink(scene_probe_path)
-            except OSError:
-                pass
         job["progress"] = 15
 
         # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して

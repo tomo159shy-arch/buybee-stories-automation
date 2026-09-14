@@ -128,7 +128,7 @@ OUT_W, OUT_H = 1080, 1920
 # Cloud Run(2GB)へ移行したので元の解像度に戻した。文字サイズ等の
 # 絶対値はREF_SCALEで比例調整する(今は1.0=無調整)。
 REF_SCALE = OUT_W / 1080
-MAX_SCENES = 2
+MAX_SCENES = 1
 MIN_SCENE_SEC = 1.5
 
 
@@ -152,6 +152,12 @@ def detect_scenes(video_path, min_scene_sec=MIN_SCENE_SEC, max_scenes=MAX_SCENES
     if duration <= 0:
         cap.release()
         return [(0.0, 0.0)]
+    if max_scenes <= 1:
+        # シーン分割自体が不要な場合、動画全体をフレームデコードして
+        # スキャンする(遅い・ハングしうる)処理を丸ごとスキップできる。
+        # ヘッダ情報から長さが分かった時点で即座に返す。
+        cap.release()
+        return [(0.0, duration)]
 
     step = max(1, int(round(fps / sample_fps)))
     prev_gray = None
