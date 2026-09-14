@@ -272,6 +272,7 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
+        job["completed_at"] = time.time()
         return
 
     # 分析が終わったらブラウザを待たずそのまま書き出しまで進める
@@ -327,10 +328,12 @@ def render_job_task(job_id):
             job["warning"] = (job.get("warning") or "") + f" 動画の永続保存に失敗しました: {e}"
 
         job["progress"] = 100
+        job["completed_at"] = time.time()
         send_push_to_all("BuyBee Stories", f"「{job['name']}」の動画が完成しました")
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
+        job["completed_at"] = time.time()
 
 
 @app.get("/api/options")
@@ -389,10 +392,31 @@ def get_library_video(object_name: str):
     )
 
 
+JOB_RETENTION_SEC = 24 * 3600
+
+
+def cleanup_old_jobs():
+    """完成/失敗から24時間以上経ったジョブのローカルファイル(job_dir)を
+    削除し、JOBS辞書からも取り除く。min-instances=1で同じインスタンスが
+    長時間動き続けるため、これをやらないとディスクが徐々に埋まっていく
+    (動画本体はすでにGCSに永続保存済みなので、ローカルの控えは消して良い)。
+    アップロードのたびに一度だけ軽く掃除する。"""
+    now = time.time()
+    stale_ids = [
+        jid for jid, j in list(JOBS.items())
+        if j.get("completed_at") and (now - j["completed_at"]) > JOB_RETENTION_SEC
+    ]
+    for jid in stale_ids:
+        job = JOBS.pop(jid, None)
+        if job and job.get("job_dir"):
+            shutil.rmtree(job["job_dir"], ignore_errors=True)
+
+
 @app.post("/api/upload")
 async def upload(files: list[UploadFile] = File(...)):
     if client is None:
         raise HTTPException(500, "GEMINI_API_KEY が設定されていません")
+    cleanup_old_jobs()
     created = []
     for f in files:
         job_id = uuid.uuid4().hex
