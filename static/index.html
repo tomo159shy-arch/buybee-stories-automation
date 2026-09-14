@@ -453,13 +453,14 @@ function updateDock(){
   const anyAnalyzing = jobs.some(j => j.status === 'analyzing');
   const anyRendering = jobs.some(j => j.status === 'rendering');
   dock.hidden = false;
-  if (anyRendering){
-    btn.innerHTML = '<span class="spinner"></span>書き出し中...'; btn.disabled = true;
+  if (anyRendering || anyAnalyzing){
+    const active = jobs.filter(j => j.status === 'analyzing' || j.status === 'rendering');
+    const avg = Math.round(active.reduce((sum, j) => sum + (j.progress || 0), 0) / active.length);
+    const label = anyRendering ? '書き出し中' : '分析中';
+    btn.innerHTML = `<span class="spinner"></span>${label}... ${avg}%`; btn.disabled = true;
   } else if (allAnalyzed){
     btn.textContent = `${jobs.length}本まとめて焼き込む`; btn.disabled = false;
     btn.onclick = renderAll;
-  } else if (anyAnalyzing){
-    btn.innerHTML = '<span class="spinner"></span>分析中...'; btn.disabled = true;
   } else {
     btn.textContent = `${jobs.length}本を分析する`; btn.disabled = false;
     btn.onclick = analyzeAll;
@@ -473,16 +474,39 @@ async function pollJob(job){
   while (true){
     const data = await api(`/api/jobs/${job.id}`);
     job.status = data.status; job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
+    job.progress = data.progress;
+    renderJobs(); updateDock();
     if (['done','error'].includes(data.status)) return data;
     await new Promise(r => setTimeout(r, 1500));
   }
 }
 
-// 分析~書き出しはサーバー側で自動連携される。画面を閉じても
-// (プッシュ通知が有効なら)完成時に通知が来る。
+// 分析/書き出しのリクエスト自体がサーバー側で完了まで待つ作りになっている
+// (Cloud Runでバックグラウンド処理のCPUが確保されない問題への対策)ため、
+// そのリクエストが終わるまでの間、進捗%だけ別リクエストで裏から取りに行く。
+function startProgressPolling(job){
+  let stopped = false;
+  const loop = (async () => {
+    while (!stopped){
+      try {
+        const data = await api(`/api/jobs/${job.id}`);
+        job.status = data.status; job.progress = data.progress;
+        job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
+        renderJobs(); updateDock();
+      } catch (e) { /* 一時的な通信エラーは無視して次回に回す */ }
+      await new Promise(r => setTimeout(r, 1200));
+    }
+  })();
+  return () => { stopped = true; };
+}
+
+// 分析~書き出しはサーバー側で自動連携される(このPOST自体が完了まで
+// 待つ作りになっている)。画面を閉じても(プッシュ通知が有効なら)
+// 完成時に通知が来る。POST中は別リクエストで進捗%だけ裏から取りに行く。
 async function analyzeJob(job){
-  job.status = 'analyzing';
+  job.status = 'analyzing'; job.progress = 0;
   renderJobs(); updateDock();
+  const stopPolling = startProgressPolling(job);
   try {
     const fd = new FormData();
     fd.append('style_key', selectedStyle);
@@ -490,9 +514,13 @@ async function analyzeJob(job){
     fd.append('font_choice', selectedFont || '');
     fd.append('text_color', selectedTextColor || '');
     await api(`/api/jobs/${job.id}/analyze`, { method:'POST', body: fd });
-    await pollJob(job);
+    const data = await api(`/api/jobs/${job.id}`);
+    job.status = data.status; job.progress = data.progress;
+    job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
   } catch (e) {
     job.status = 'error'; job.error = e.message;
+  } finally {
+    stopPolling();
   }
   renderJobs(); updateDock();
   if (job.status === 'done'){
@@ -504,14 +532,19 @@ async function analyzeJob(job){
 // 編集後の再書き出し用(初回の自動書き出しはanalyzeJobがサーバー側の
 // 連携で完了させるので、これは手動での再生成にのみ使う)。
 async function renderJob(job){
-  job.status = 'rendering';
+  job.status = 'rendering'; job.progress = 55;
   renderJobs(); updateDock();
+  const stopPolling = startProgressPolling(job);
   try {
     await flushSync(job);
     await api(`/api/jobs/${job.id}/render`, { method:'POST' });
-    await pollJob(job);
+    const data = await api(`/api/jobs/${job.id}`);
+    job.status = data.status; job.progress = data.progress;
+    job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
   } catch (e) {
     job.status = 'error'; job.error = e.message;
+  } finally {
+    stopPolling();
   }
   renderJobs(); updateDock();
   if (job.status === 'done'){
@@ -564,12 +597,14 @@ function jobCard(job){
   const el = document.createElement('div');
   el.className = 'jobcard';
 
+  const showsProgress = job.status === 'analyzing' || job.status === 'rendering';
   const statusLabel = {
     uploaded:'待機中', analyzing:'分析中…', analyzed:'編集可能',
     rendering:'書き出し中…', done:'完成', error:'エラー',
   }[job.status] || job.status;
+  const statusText = showsProgress ? `${statusLabel} ${job.progress || 0}%` : statusLabel;
 
-  let head = `<div class="jobhead"><div class="name">${esc(job.name)}</div><div class="status">${esc(statusLabel)}</div></div>`;
+  let head = `<div class="jobhead"><div class="name">${esc(job.name)}</div><div class="status">${esc(statusText)}</div></div>`;
   let body = '<div class="jobbody">';
 
   if (job.status === 'uploaded'){

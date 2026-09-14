@@ -4,6 +4,7 @@ import json
 import random
 import re
 import subprocess
+import threading
 import numpy as np
 import cv2
 import requests
@@ -343,10 +344,19 @@ def make_scene_probe(video_path, job_dir, timeout=60):
     return probe_path
 
 
-def burn_video_scenes(video_path, scenes, out_path):
+def _parse_hms(s):
+    try:
+        h, m, sec = s.split(":")
+        return int(h) * 3600 + int(m) * 60 + float(sec)
+    except (ValueError, AttributeError):
+        return None
+
+
+def burn_video_scenes(video_path, scenes, out_path, progress_cb=None):
     """scenes: [{start, end, text_img(PIL), stamp_img(PIL), stamp_xy:(x,y)}, ...]
     各シーンのテキスト・スタンプを、境界でふわっとクロスフェードしながら
-    その時間帯だけ表示するよう連結する。"""
+    その時間帯だけ表示するよう連結する。progress_cb(0.0〜1.0)が渡されれば、
+    ffmpegの進捗(-progress)を読み取ってその都度呼び出す(進捗%表示用)。"""
     tmp_files = []
     inputs = ["-threads", "2", "-i", video_path]
     filters = [
@@ -414,15 +424,40 @@ def burn_video_scenes(video_path, scenes, out_path):
         "-c:v", "libx264", "-preset", "fast", "-crf", "20",
         "-c:a", "aac",
         "-shortest",
+        "-progress", "pipe:1", "-nostats",
         out_path,
     ]
+    total_duration = max((s["end"] for s in scenes), default=1.0) or 1.0
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # stdout(-progressの進捗行)とstderr(通常のログ)を同時にpipeで
+        # 溜めると、片方を読んでいる間にもう片方のバッファが溢れて
+        # ffmpeg自体が書き込みブロックし、デッドロック(ハング)する。
+        # stderrは別スレッドで並行して読み切っておく。
+        stderr_chunks = []
+        stderr_thread = threading.Thread(target=lambda: stderr_chunks.append(proc.stderr.read()), daemon=True)
+        stderr_thread.start()
+        try:
+            for line in proc.stdout:
+                line = line.strip()
+                if progress_cb and line.startswith("out_time="):
+                    sec = _parse_hms(line.split("=", 1)[1])
+                    if sec is not None:
+                        try:
+                            progress_cb(min(sec / total_duration, 0.99))
+                        except Exception:
+                            pass
+            returncode = proc.wait(timeout=300)
+            stderr_thread.join(timeout=10)
+            stderr_data = "".join(stderr_chunks)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise
     finally:
         for p in tmp_files:
             os.unlink(p)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr[-3000:])
+    if returncode != 0:
+        raise RuntimeError(stderr_data[-3000:])
     return out_path
 
 

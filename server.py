@@ -191,6 +191,7 @@ def analyze_one_scene(job, idx, start, end, style_key, product_context, font_cho
 
 def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
     job = JOBS[job_id]
+    job["progress"] = 5
     try:
         product_context = ""
         if product_url:
@@ -212,9 +213,13 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
                 os.unlink(scene_probe_path)
             except OSError:
                 pass
+        job["progress"] = 15
 
         # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して
         # 分析時間を短縮する(逐次だとシーン数×待ち時間がそのまま積み上がる)。
+        # 完了したシーンの数に応じて15%→50%まで進捗を進める。
+        total_scenes = max(len(scene_bounds), 1)
+        done_count = 0
         results = [None] * len(scene_bounds)
         with ThreadPoolExecutor(max_workers=max(len(scene_bounds), 1)) as pool:
             futures = {
@@ -227,6 +232,8 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
             for future in as_completed(futures):
                 idx = futures[future]
                 results[idx] = future.result()
+                done_count += 1
+                job["progress"] = 15 + int(35 * done_count / total_scenes)
 
         scenes = []
         warnings = []
@@ -247,6 +254,7 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
         job["scenes"] = scenes
         job["style_key"] = style_key
         job["status"] = "analyzed"
+        job["progress"] = 55
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
@@ -259,6 +267,7 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
 
 def render_job_task(job_id):
     job = JOBS[job_id]
+    job["progress"] = max(job.get("progress") or 0, 55)
     try:
         render_scenes = []
         for scene in job["scenes"]:
@@ -281,9 +290,15 @@ def render_job_task(job_id):
                 "text_img": text_img, "stamp_img": stamp_img, "stamp_xy": stamp_xy,
             })
         out_path = os.path.join(job["job_dir"], "output.mp4")
-        burn_video_scenes(job["video_path"], render_scenes, out_path)
+
+        def _on_progress(frac):
+            # 書き出し本編は55%~95%の範囲にマッピングする。
+            job["progress"] = 55 + int(frac * 40)
+
+        burn_video_scenes(job["video_path"], render_scenes, out_path, progress_cb=_on_progress)
         job["output_path"] = out_path
         job["status"] = "done"
+        job["progress"] = 95
 
         # Cloud Runのローカルディスクはインスタンスが再起動すると消えるため、
         # 完成した動画は必ずGCS(永続ストレージ)にもアップロードしておく。
@@ -297,6 +312,7 @@ def render_job_task(job_id):
         except Exception as e:
             job["warning"] = (job.get("warning") or "") + f" 動画の永続保存に失敗しました: {e}"
 
+        job["progress"] = 100
         send_push_to_all("BuyBee Stories", f"「{job['name']}」の動画が完成しました")
     except Exception as e:
         job["status"] = "error"
@@ -373,7 +389,7 @@ async def upload(files: list[UploadFile] = File(...)):
         JOBS[job_id] = {
             "id": job_id, "name": f.filename, "video_path": video_path, "job_dir": job_dir,
             "status": "uploaded", "scenes": None, "style_key": None,
-            "output_path": None, "error": None, "warning": None,
+            "output_path": None, "error": None, "warning": None, "progress": 0,
         }
         created.append({"id": job_id, "name": f.filename})
     return {"jobs": created}
@@ -389,12 +405,13 @@ def analyze(
         raise HTTPException(404, "job not found")
     job["status"] = "analyzing"
     job["warning"] = None
-    # 分析が終わったら書き出しまでサーバー側で自動的に続けるので、
-    # 画面(ブラウザ)を閉じていても最後まで完成する。
-    threading.Thread(
-        target=analyze_video_job, args=(job_id, style_key, product_url, font_choice, text_color), daemon=True,
-    ).start()
-    return {"status": "analyzing"}
+    # Cloud Runはリクエスト処理外のバックグラウンドスレッドにCPUを
+    # ちゃんと割り当てない場合があり、「分析中のまま進まない」原因になって
+    # いた。このリクエストの中で(書き出しまで)同期的に処理を終わらせる
+    # ことで、Cloud Run側にもこの処理時間分のCPUを確実に割り当てさせる。
+    # 画面を閉じてもサーバー側の処理自体は最後まで続く。
+    analyze_video_job(job_id, style_key, product_url, font_choice, text_color)
+    return {"status": job["status"]}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -405,7 +422,7 @@ def get_job(job_id: str):
     return {
         "id": job["id"], "name": job["name"], "status": job["status"],
         "scenes": job["scenes"], "error": job["error"], "warning": job["warning"],
-        "has_output": bool(job["output_path"]),
+        "has_output": bool(job["output_path"]), "progress": job.get("progress", 0),
     }
 
 
@@ -426,8 +443,8 @@ def render(job_id: str):
     if not job.get("scenes"):
         raise HTTPException(400, "scenes not analyzed yet")
     job["status"] = "rendering"
-    threading.Thread(target=render_job_task, args=(job_id,), daemon=True).start()
-    return {"status": "rendering"}
+    render_job_task(job_id)
+    return {"status": job["status"]}
 
 
 @app.get("/api/jobs/{job_id}/video")
