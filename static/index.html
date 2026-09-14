@@ -166,6 +166,13 @@
     <button class="pill" id="pushBtn">完成したら通知を受け取る</button>
   </div>
 
+  <div style="text-align:center;margin-bottom:8px">
+    <button class="pill" id="libraryToggleBtn">保存した動画を見る</button>
+  </div>
+  <div id="librarySection" class="card" hidden style="margin-bottom:16px">
+    <div id="libraryList" class="muted">読み込み中…</div>
+  </div>
+
   <div class="section-t">動画をアップロード（複数可）</div>
   <label class="drop" id="dropzone">
     <input type="file" id="fileInput" multiple accept="video/mp4,video/quicktime,video/x-msvideo">
@@ -277,6 +284,48 @@ async function enablePush(){
   } catch (e) {
     alert('通知の設定に失敗しました: ' + e.message
       + (location.protocol !== 'https:' ? '（HTTPSでのみ使えます）' : ''));
+  }
+}
+
+// 完成した動画は全部サーバー(GCS)に永続保存されるので、ブラウザの
+// ジョブ一覧が消えても/再起動があっても、ここから必ず見返せる。
+let libraryLoaded = false;
+$('#libraryToggleBtn').addEventListener('click', async () => {
+  const box = $('#librarySection');
+  box.hidden = !box.hidden;
+  if (!box.hidden && !libraryLoaded) {
+    libraryLoaded = true;
+    await loadLibrary();
+  }
+});
+
+function formatBytes(n){
+  if (!n) return '';
+  const mb = n / (1024 * 1024);
+  return mb >= 1000 ? (mb/1024).toFixed(1) + 'GB' : mb.toFixed(1) + 'MB';
+}
+
+async function loadLibrary(){
+  const list = $('#libraryList');
+  try {
+    const { videos } = await api('/api/library');
+    if (!videos.length) {
+      list.innerHTML = '<div class="muted">まだ保存された動画はありません</div>';
+      return;
+    }
+    list.innerHTML = videos.map(v => {
+      const dt = v.created ? new Date(v.created).toLocaleString('ja-JP') : '';
+      const url = `/api/library/${encodeURIComponent(v.name)}/video`;
+      return `<div style="margin-bottom:18px">
+        <video controls playsinline style="width:100%;border-radius:var(--r-s);background:#000"
+          src="${url}" preload="none"></video>
+        <div class="muted" style="margin-top:4px">${esc(dt)}　${formatBytes(v.size)}</div>
+        <a class="btn btn-plain btn-block" style="margin-top:6px;text-decoration:none" href="${url}" download>
+          <span class="icon">${ICON.download}</span>ダウンロード</a>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div class="warn">⚠️ 一覧の取得に失敗しました: ' + esc(e.message) + '</div>';
   }
 }
 

@@ -1,15 +1,17 @@
 import os
 import io
+import re
 import json
 import time
 import uuid
 import shutil
 import tempfile
 import threading
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
@@ -22,6 +24,7 @@ from core import (
     build_text_overlay, build_stamp, stamp_target_position, burn_video_scenes,
     log_feedback, style_average_ratings, shuffle_stamp, fetch_product_page_text,
 )
+import gcs_store
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-flash-lite-latest"
@@ -30,7 +33,10 @@ client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:admin@example.com")
-PUSH_SUBSCRIPTIONS = []
+# Cloud Runはインスタンスが再起動すると空メモリに戻ってしまうため、
+# 購読情報はGCSから読み込んで復元する(でないと再起動ごとに
+# 「通知が来ない」状態になる)。
+PUSH_SUBSCRIPTIONS = gcs_store.load_push_subscriptions()
 PUSH_LOCK = threading.Lock()
 
 app = FastAPI()
@@ -63,6 +69,11 @@ def send_push_to_all(title, body):
             for sub in dead:
                 if sub in PUSH_SUBSCRIPTIONS:
                     PUSH_SUBSCRIPTIONS.remove(sub)
+            subs_copy = list(PUSH_SUBSCRIPTIONS)
+        try:
+            gcs_store.save_push_subscriptions(subs_copy)
+        except Exception:
+            pass
 
 
 def ask_gemini(frame_path, style_key, product_context=""):
@@ -263,6 +274,19 @@ def render_job_task(job_id):
         burn_video_scenes(job["video_path"], render_scenes, out_path)
         job["output_path"] = out_path
         job["status"] = "done"
+
+        # Cloud Runのローカルディスクはインスタンスが再起動すると消えるため、
+        # 完成した動画は必ずGCS(永続ストレージ)にもアップロードしておく。
+        # これが無いと「完成通知が来た頃には見れなくなっている」が起きる。
+        try:
+            safe_name = re.sub(r"[^\w.\-]+", "_", os.path.splitext(job["name"])[0])[:60]
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            object_name = f"{ts}_{safe_name}_{job_id[:8]}.mp4"
+            gcs_store.upload_video(out_path, object_name)
+            job["library_name"] = object_name
+        except Exception as e:
+            job["warning"] = (job.get("warning") or "") + f" 動画の永続保存に失敗しました: {e}"
+
         send_push_to_all("BuyBee Stories", f"「{job['name']}」の動画が完成しました")
     except Exception as e:
         job["status"] = "error"
@@ -294,7 +318,35 @@ async def push_subscribe(payload: dict):
     with PUSH_LOCK:
         if payload not in PUSH_SUBSCRIPTIONS:
             PUSH_SUBSCRIPTIONS.append(payload)
+        subs_copy = list(PUSH_SUBSCRIPTIONS)
+    # 次にインスタンスが再起動しても購読が消えないよう、その都度GCSに保存する。
+    try:
+        gcs_store.save_push_subscriptions(subs_copy)
+    except Exception:
+        pass
     return {"ok": True}
+
+
+@app.get("/api/library")
+def list_library():
+    """今まで完成した動画の一覧(新しい順)。インスタンス再起動やブラウザの
+    ジョブ一覧が消えても、ここからいつでも見返せる。"""
+    try:
+        return {"videos": gcs_store.list_videos()}
+    except Exception as e:
+        raise HTTPException(500, f"一覧の取得に失敗しました: {e}")
+
+
+@app.get("/api/library/{object_name}/video")
+def get_library_video(object_name: str):
+    blob = gcs_store.get_video_blob(object_name)
+    if blob is None or not blob.exists():
+        raise HTTPException(404, "video not found")
+    data = blob.download_as_bytes()
+    return StreamingResponse(
+        io.BytesIO(data), media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="{object_name}"'},
+    )
 
 
 @app.post("/api/upload")
