@@ -132,6 +132,16 @@ MAX_SCENES = 2
 MIN_SCENE_SEC = 1.5
 
 
+def probe_duration(video_path):
+    """フレームをデコードせずヘッダ情報だけで動画の長さを取得する(高速)。
+    detect_scenes()がタイムアウトした際の1シーンフォールバック用。"""
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    cap.release()
+    return (total_frames / fps) if fps else 0.0
+
+
 def detect_scenes(video_path, min_scene_sec=MIN_SCENE_SEC, max_scenes=MAX_SCENES, sample_fps=4):
     """フレーム差分でカット点を検出し、(開始秒, 終了秒)のリストを返す。
     カットが見つからない場合は動画全体を1シーンとして返す。"""

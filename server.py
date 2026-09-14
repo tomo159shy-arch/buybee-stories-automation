@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import threading
 from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -20,7 +20,7 @@ import cv2
 
 from core import (
     STAMP_COLORS, STYLE_PRESETS, FONT_OPTIONS, TEXT_COLORS,
-    detect_scenes, grab_frame_at, analyze_zones, make_scene_probe,
+    detect_scenes, grab_frame_at, analyze_zones, make_scene_probe, probe_duration,
     build_text_overlay, build_stamp, stamp_target_position, burn_video_scenes,
     log_feedback, style_average_ratings, shuffle_stamp, fetch_product_page_text,
 )
@@ -124,7 +124,12 @@ def ask_gemini(frame_path, style_key, product_context=""):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/png"), prompt],
-                config=types.GenerateContentConfig(response_mime_type="application/json"),
+                # timeoutを指定しないとAPI側がハングした場合に無期限に待ち続けて
+                # しまう(「分析が進まない」不具合の再発防止)。ミリ秒指定。
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    http_options=types.HttpOptions(timeout=30_000),
+                ),
             )
             parsed = json.loads(response.text)
             # まれにGeminiが単一オブジェクトではなく配列で返すことがあるため、
@@ -207,7 +212,22 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
         # だけは精度優先で元の高解像度から取得する。
         original_path = job["video_path"]
         scene_probe_path = make_scene_probe(original_path, job["job_dir"])
-        scene_bounds = detect_scenes(scene_probe_path)
+
+        # detect_scenesはffmpeg/requestsのようなタイムアウト機構が無く、
+        # 想定外に大きい/長い動画だと無期限にハングしうる(「5%のまま進まない」
+        # 不具合の原因だった)。30秒でタイムアウトし、動画全体を1シーンとして
+        # 扱うフォールバックに切り替える(タイムアウトさせたスレッドの完了は
+        # 待たない=wait=Falseで、これ自体が処理をブロックしないようにする)。
+        probe_pool = ThreadPoolExecutor(max_workers=1)
+        try:
+            scene_bounds = probe_pool.submit(detect_scenes, scene_probe_path).result(timeout=30)
+        except FuturesTimeoutError:
+            duration = probe_duration(scene_probe_path) or probe_duration(original_path) or 10.0
+            scene_bounds = [(0.0, duration)]
+            job["warning"] = (job.get("warning") or "") + " シーン検出が時間内に終わらなかったため、動画全体を1シーンとして扱いました"
+        finally:
+            probe_pool.shutdown(wait=False)
+
         if scene_probe_path != original_path:
             try:
                 os.unlink(scene_probe_path)
