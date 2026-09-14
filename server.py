@@ -18,7 +18,7 @@ import cv2
 
 from core import (
     STAMP_COLORS, STYLE_PRESETS, FONT_OPTIONS, TEXT_COLORS,
-    detect_scenes, grab_frame_at, analyze_zones, normalize_video,
+    detect_scenes, grab_frame_at, analyze_zones, make_scene_probe,
     build_text_overlay, build_stamp, stamp_target_position, burn_video_scenes,
     log_feedback, style_average_ratings, shuffle_stamp, fetch_product_page_text,
 )
@@ -180,12 +180,17 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
 
         # シーンの切れ目検出は動画全体をフレーム単位で走査するため、
         # 元の高解像度(4K等)のままだと非常に遅くなる。切れ目検出自体は
-        # 精度に文字の読みやすさは関係ないので、先に軽量プロキシを作り
-        # そちらを使う。一方、Geminiに渡す代表フレーム(値札等を読む部分)
+        # 精度に文字の読みやすさは関係ないので、思い切り軽いプローブを
+        # 作ってそちらを使う。Geminiに渡す代表フレーム(値札等を読む部分)
         # だけは精度優先で元の高解像度から取得する。
         original_path = job["video_path"]
-        proxy_path = normalize_video(original_path, job["job_dir"])
-        scene_bounds = detect_scenes(proxy_path)
+        scene_probe_path = make_scene_probe(original_path, job["job_dir"])
+        scene_bounds = detect_scenes(scene_probe_path)
+        if scene_probe_path != original_path:
+            try:
+                os.unlink(scene_probe_path)
+            except OSError:
+                pass
 
         # シーンごとのGemini呼び出しは互いに独立しているので並列に実行して
         # 分析時間を短縮する(逐次だとシーン数×待ち時間がそのまま積み上がる)。
@@ -212,14 +217,11 @@ def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
         if warnings:
             job["warning"] = "シーン分析に失敗しました: " + " / ".join(warnings)
 
-        # 最終書き出し(ffmpegのoverlay+encode)は軽量プロキシを使う。
-        # 元の4K/HEVC動画のままだとそのデコードだけでメモリを大きく消費するため。
-        job["video_path"] = proxy_path
-        if proxy_path != original_path:
-            try:
-                os.unlink(original_path)
-            except OSError:
-                pass
+        # 最終書き出し(burn_video_scenes)は元動画を直接使う。そちら自身の
+        # scaleフィルタでOUT_W/OUT_Hに縮小されるので、ここで別途プロキシを
+        # 作ると二重にffmpeg変換することになり遅くなるだけ。Cloud Run
+        # (2GB/2CPU)ならこの1回の変換で十分間に合う。
+        job["video_path"] = original_path
 
         job["scenes"] = scenes
         job["style_key"] = style_key

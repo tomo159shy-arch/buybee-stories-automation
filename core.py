@@ -315,32 +315,30 @@ def stamp_target_position(stamp_img, corner="top-right", text_zone="middle", mar
 FADE_SEC = 0.3
 
 
-def normalize_video(video_path, job_dir, timeout=180):
-    """iPhoneの4K/HEVC動画をそのまま最終書き出し(ffmpegのoverlay+encode)に
-    通すと、そのデコード負荷だけでメモリを大きく消費する。シーン分析は
-    (精度のため)元の高解像度動画に対して先に行い、この関数は分析が終わった
-    後、最終書き出し専用の軽量プロキシを作るために呼ぶ。
-    Cloud Run(2GB)移行後はメモリの余裕があるので、プロキシ自体の画質は
-    そこそこ良くしておく(ここで画質を落としすぎると最終書き出しで
-    二重に劣化するため)。変換に失敗した場合は元動画のまま処理を続行する。"""
-    proxy_path = os.path.join(job_dir, "proxy.mp4")
+def make_scene_probe(video_path, job_dir, timeout=60):
+    """シーンの切れ目検出(detect_scenes)専用の、思い切り軽い低解像度・
+    無音のプレビューを作る。切れ目検出の精度は解像度に依存しないので、
+    ここは速度だけを優先する。Cloud Run(2GB/2CPU)移行後は最終書き出し
+    自体は元動画を直接使える(burn_video_scenes側のscaleフィルタで
+    縮小されるので二重変換にならない)ため、この軽いプローブだけ作れば
+    十分。変換に失敗した場合は元動画のまま処理を続行する。"""
+    probe_path = os.path.join(job_dir, "scene_probe.mp4")
     cmd = [
         "ffmpeg", "-y",
         "-threads", "2", "-i", video_path,
-        "-vf", f"scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,crop={OUT_W}:{OUT_H}",
-        "-map", "0:v:0", "-map", "0:a:0?",
+        "-vf", "scale=320:-2",
+        "-an",
         "-threads", "2",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-        "-c:a", "aac", "-b:a", "128k",
-        proxy_path,
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
+        probe_path,
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return video_path
-    if result.returncode != 0 or not os.path.exists(proxy_path):
+    if result.returncode != 0 or not os.path.exists(probe_path):
         return video_path
-    return proxy_path
+    return probe_path
 
 
 def burn_video_scenes(video_path, scenes, out_path):
