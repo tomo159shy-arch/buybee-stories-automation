@@ -417,7 +417,9 @@ def burn_video_scenes(video_path, scenes, out_path, progress_cb=None):
         "-progress", "pipe:1", "-nostats",
         out_path,
     ]
-    total_duration = max((s["end"] for s in scenes), default=1.0) or 1.0
+    # 全シーンがskipされ scenes が空になった場合(分析が全滅した場合など)、
+    # シーンの終端時刻から総時間を推定できないため、元動画自体の長さを使う。
+    total_duration = max((s["end"] for s in scenes), default=0.0) or probe_duration(video_path) or 1.0
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         # stdout(-progressの進捗行)とstderr(通常のログ)を同時にpipeで
