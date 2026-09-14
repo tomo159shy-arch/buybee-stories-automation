@@ -121,7 +121,7 @@ def ask_gemini(frame_path, style_key, product_context=""):
     raise last_error
 
 
-def analyze_one_scene(job, idx, start, end, style_key, product_context):
+def analyze_one_scene(job, idx, start, end, style_key, product_context, font_choice, text_color):
     """1シーン分の代表フレーム抽出+Gemini分析。シーン間で並列実行できるよう
     副作用(ファイル保存)以外は全部この関数の中で完結させている。"""
     video_path = job["video_path"]
@@ -160,13 +160,14 @@ def analyze_one_scene(job, idx, start, end, style_key, product_context):
         "start": start, "end": end,
         "text_zone": text_zone, "stamp_corner": stamp_corner,
         "text_scale": 1.0, "skip": False,
-        "font_choice": list(FONT_OPTIONS.keys())[0], "text_color": "白",
+        "font_choice": font_choice or list(FONT_OPTIONS.keys())[0],
+        "text_color": text_color or "白",
         **result,
     }
     return scene, last_error
 
 
-def analyze_video_job(job_id, style_key, product_url):
+def analyze_video_job(job_id, style_key, product_url, font_choice, text_color):
     job = JOBS[job_id]
     try:
         product_context = ""
@@ -188,7 +189,7 @@ def analyze_video_job(job_id, style_key, product_url):
         results = [None] * len(scene_bounds)
         with ThreadPoolExecutor(max_workers=max(len(scene_bounds), 1)) as pool:
             futures = {
-                pool.submit(analyze_one_scene, job, idx, start, end, style_key, product_context): idx
+                pool.submit(analyze_one_scene, job, idx, start, end, style_key, product_context, font_choice, text_color): idx
                 for idx, (start, end) in enumerate(scene_bounds)
             }
             for future in as_completed(futures):
@@ -222,6 +223,11 @@ def analyze_video_job(job_id, style_key, product_url):
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
+        return
+
+    # 分析が終わったらブラウザを待たずそのまま書き出しまで進める
+    # (画面を閉じていても最後まで完了させたいため、連携はサーバー側で行う)。
+    render_job_task(job_id)
 
 
 def render_job_task(job_id):
@@ -306,13 +312,20 @@ async def upload(files: list[UploadFile] = File(...)):
 
 
 @app.post("/api/jobs/{job_id}/analyze")
-def analyze(job_id: str, style_key: str = Form(...), product_url: str = Form("")):
+def analyze(
+    job_id: str, style_key: str = Form(...), product_url: str = Form(""),
+    font_choice: str = Form(""), text_color: str = Form(""),
+):
     job = JOBS.get(job_id)
     if not job:
         raise HTTPException(404, "job not found")
     job["status"] = "analyzing"
     job["warning"] = None
-    threading.Thread(target=analyze_video_job, args=(job_id, style_key, product_url), daemon=True).start()
+    # 分析が終わったら書き出しまでサーバー側で自動的に続けるので、
+    # 画面(ブラウザ)を閉じていても最後まで完成する。
+    threading.Thread(
+        target=analyze_video_job, args=(job_id, style_key, product_url, font_choice, text_color), daemon=True,
+    ).start()
     return {"status": "analyzing"}
 
 

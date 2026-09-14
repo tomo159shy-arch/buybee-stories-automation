@@ -417,15 +417,20 @@ function updateDock(){
   }
 }
 
+// 'analyzed'では止まらない。分析が終わったらサーバー側がそのまま書き出しまで
+// 自動で続ける(画面を閉じていても最後まで完成させるため)ので、ここでは
+// 'done'/'error'になるまで待てば良い。
 async function pollJob(job){
   while (true){
     const data = await api(`/api/jobs/${job.id}`);
     job.status = data.status; job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
-    if (['analyzed','done','error'].includes(data.status)) return data;
+    if (['done','error'].includes(data.status)) return data;
     await new Promise(r => setTimeout(r, 1500));
   }
 }
 
+// 分析~書き出しはサーバー側で自動連携される。画面を閉じても
+// (プッシュ通知が有効なら)完成時に通知が来る。
 async function analyzeJob(job){
   job.status = 'analyzing';
   renderJobs(); updateDock();
@@ -433,18 +438,22 @@ async function analyzeJob(job){
     const fd = new FormData();
     fd.append('style_key', selectedStyle);
     fd.append('product_url', job.url || '');
+    fd.append('font_choice', selectedFont || '');
+    fd.append('text_color', selectedTextColor || '');
     await api(`/api/jobs/${job.id}/analyze`, { method:'POST', body: fd });
     await pollJob(job);
-    if (job.scenes) {
-      job.scenes.forEach(s => { s.font_choice = selectedFont; s.text_color = selectedTextColor; });
-      await flushSync(job);
-    }
   } catch (e) {
     job.status = 'error'; job.error = e.message;
   }
   renderJobs(); updateDock();
+  if (job.status === 'done'){
+    const el = document.getElementById(`video-${job.id}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
+// 編集後の再書き出し用(初回の自動書き出しはanalyzeJobがサーバー側の
+// 連携で完了させるので、これは手動での再生成にのみ使う)。
 async function renderJob(job){
   job.status = 'rendering';
   renderJobs(); updateDock();
@@ -464,10 +473,7 @@ async function renderJob(job){
 
 // アップロード直後に呼ばれ、分析→書き出しまで人の手を挟まず自動で進める
 async function autoRun(newJobs){
-  await Promise.all(newJobs.map(async job => {
-    await analyzeJob(job);
-    if (job.status === 'analyzed') await renderJob(job);
-  }));
+  await Promise.all(newJobs.map(analyzeJob));
   $('#exportSection').hidden = false;
 }
 
