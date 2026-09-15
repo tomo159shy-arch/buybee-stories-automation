@@ -434,9 +434,9 @@ async function restoreJobs(){
       });
     } catch (e) { /* サーバー再起動等で消えていたら無視 */ }
   }
-  if (!restored.length) return;
   jobs = restored;
   saveJobIds();
+  if (!restored.length) return;
   $('#styleSection').hidden = false;
   if (jobs.some(j => j.scenes && j.scenes.length)) $('#exportSection').hidden = false;
   renderJobs();
