@@ -10,7 +10,7 @@ import numpy as np
 import cv2
 import requests
 from bs4 import BeautifulSoup
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 def _first_existing(*paths):
     """候補パスのうち最初に実在するものを返す(Windowsローカル実行と
@@ -249,16 +249,28 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 
-def contrast_stroke(fill_color):
-    """文字色が暗い(黒系)場合は白縁取りに、それ以外は黒縁取りにして
-    どんな背景でも視認性を保つ。"""
-    return "white" if fill_color.lstrip("#").lower() in ("111111", "000000") else "black"
-
-
 def draw_stroked_text(draw, pos, text, font, fill="white", stroke_fill="black", stroke_width=None):
     if stroke_width is None:
         stroke_width = max(int(7 * REF_SCALE), 2)
     draw.text(pos, text, font=font, fill=fill, stroke_width=stroke_width, stroke_fill=stroke_fill)
+
+
+def draw_instagram_text(canvas, pos, text, font, fill="#FFFFFF"):
+    """Instagramの「クラシック」テキストスタイルを再現。文字の周りを太い線で
+    囲む縁取りではなく、少し下にずらしてぼかした柔らかい影を敷いてから、
+    その上にくっきりした文字本体を重ねる(実際のBuyBee公式ストーリーズの
+    キャプションと同じ見た目にするため)。文字色が黒系の時は黒影だと文字に
+    埋もれて見えなくなるので、影の色は白に切り替えて視認性を保つ。"""
+    is_dark_fill = fill.lstrip("#").lower() in ("111111", "000000")
+    shadow_rgba = (255, 255, 255, 170) if is_dark_fill else (0, 0, 0, 170)
+    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).text(
+        (pos[0] + max(int(3 * REF_SCALE), 1), pos[1] + max(int(4 * REF_SCALE), 1)),
+        text, font=font, fill=shadow_rgba,
+    )
+    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=max(3 * REF_SCALE, 1.5)))
+    canvas.alpha_composite(shadow)
+    ImageDraw.Draw(canvas).text(pos, text, font=font, fill=fill)
 
 
 def build_text_overlay(title, body, price, zone="top", scale=1.0, font_path=FONT_BOLD, text_color="#FFFFFF"):
@@ -273,7 +285,6 @@ def build_text_overlay(title, body, price, zone="top", scale=1.0, font_path=FONT
     title_font = ImageFont.truetype(font_path, max(int(76 * scale), 10))
     body_font = ImageFont.truetype(font_path, max(int(54 * scale), 10))
     price_font = ImageFont.truetype(font_path, max(int(64 * scale), 10))
-    stroke_color = contrast_stroke(text_color)
 
     pad_x = int(56 * REF_SCALE)
     max_w = OUT_W - pad_x * 2
@@ -282,19 +293,19 @@ def build_text_overlay(title, body, price, zone="top", scale=1.0, font_path=FONT
 
     if title:
         for line in wrap_text(draw, title, title_font, max_w):
-            draw_stroked_text(draw, (pad_x, y), line, title_font, fill=text_color, stroke_fill=stroke_color)
+            draw_instagram_text(canvas, (pad_x, y), line, title_font, fill=text_color)
             y += int(92 * scale)
 
     if body:
         y += int(30 * scale)
         for raw_line in body.split("\n"):
             for line in wrap_text(draw, raw_line, body_font, max_w):
-                draw_stroked_text(draw, (pad_x, y), line, body_font, fill=text_color, stroke_fill=stroke_color)
+                draw_instagram_text(canvas, (pad_x, y), line, body_font, fill=text_color)
                 y += int(70 * scale)
 
     if price:
         price_y = OUT_H - int(300 * REF_SCALE)
-        draw_stroked_text(draw, (pad_x, price_y), price, price_font, fill=text_color, stroke_fill=stroke_color)
+        draw_instagram_text(canvas, (pad_x, price_y), price, price_font, fill=text_color)
 
     return canvas
 
