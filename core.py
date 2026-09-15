@@ -3,6 +3,7 @@ import os
 import json
 import random
 import re
+import shutil
 import subprocess
 import threading
 import numpy as np
@@ -401,7 +402,13 @@ def burn_video_scenes(video_path, scenes, out_path, progress_cb=None):
 
     filter_complex = ";".join(filters)
 
+    # Cloud Runは1インスタンスしか無い(min/max=1)ため、書き出し(重いCPU処理)中でも
+    # 同じインスタンスで進捗確認等の軽いリクエストを捌く必要がある。niceでffmpegの
+    # 優先度を下げておくと、空いている時はこれまで通りフルスピードで動きつつ、
+    # 混雑時だけOSが他のリクエスト処理側にCPUを優先的に回してくれる。
+    nice_prefix = ["nice", "-n", "15"] if shutil.which("nice") else []
     cmd = [
+        *nice_prefix,
         "ffmpeg", "-y",
         *inputs,
         "-filter_complex", filter_complex,
