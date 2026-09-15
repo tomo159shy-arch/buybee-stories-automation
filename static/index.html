@@ -480,20 +480,23 @@ async function pollJob(job){
 // 切れただけで、サーバー側の処理は裏で続いている可能性が高い。
 // なので接続エラーだけで即「失敗」と決めず、実際のジョブ状態を
 // 確認できるまでポーリングし続け、サーバーが本当にdone/errorを
-// 返すまで諦めない。一時的な通信断(最大20回=約1分)は無視してリトライする。
+// 返すまで諦めない。書き出し中はCloud Runの1インスタンスがCPUを
+// 使い切り、状態確認のポーリング自体が何度も429で失敗することが
+// あるため、失敗「回数」ではなく最後に成功してからの経過時間で
+// 判定する(サーバー側のリクエストタイムアウト(15分)より長く待つ)。
 async function waitUntilSettled(job){
-  let fails = 0;
+  let lastSuccess = Date.now();
+  const GIVE_UP_MS = 16 * 60 * 1000;
   while (true){
     try {
       const data = await api(`/api/jobs/${job.id}`);
       job.status = data.status; job.progress = data.progress;
       job.scenes = data.scenes; job.warning = data.warning; job.error = data.error;
       renderJobs(); updateDock();
-      fails = 0;
+      lastSuccess = Date.now();
       if (['done','error'].includes(job.status)) return data;
     } catch (e) {
-      fails++;
-      if (fails >= 20){
+      if (Date.now() - lastSuccess >= GIVE_UP_MS){
         job.status = 'error';
         job.error = '通信状態が悪く状態を確認できませんでした。電波の良い場所でこの画面をもう一度開いてみてください。';
         renderJobs(); updateDock();
